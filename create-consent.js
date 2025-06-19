@@ -330,7 +330,7 @@ async  function hideAllBanners(){
     
       const visitorId = await getOrCreateVisitorId();
       const siteName = await cleanHostname(window.location.hostname);
-      const response = await fetch('https://cb-server.web-8fb.workers.dev/api/visitor-token', {
+      const response = await fetch('https://cb-server-copy.web-8fb.workers.dev/api/visitor-token', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
@@ -349,7 +349,7 @@ async  function hideAllBanners(){
           
           // Generate new visitor ID and retry once
           const newVisitorId = await getOrCreateVisitorId();
-          const retryResponse = await fetch('https://cb-server.web-8fb.workers.dev/api/visitor-token', {
+          const retryResponse = await fetch('https://cb-server-copy.web-8fb.workers.dev/api/visitor-token', {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json'
@@ -392,7 +392,7 @@ async  function hideAllBanners(){
     if (!sessionToken) return 180;
     try {
       const siteName = window.location.hostname.replace(/^www\./, '').split('.')[0];
-      const apiUrl = `https://cb-server.web-8fb.workers.dev/api/app-data?siteName=${encodeURIComponent(siteName)}`;
+      const apiUrl = `https://cb-server-copy.web-8fb.workers.dev/api/app-data?siteName=${encodeURIComponent(siteName)}`;
       const response = await fetch(apiUrl, {
         method: "GET",
         headers: {
@@ -437,7 +437,7 @@ async  function hideAllBanners(){
       
       const siteName = window.location.hostname.replace(/^www\./, '').split('.')[0];
       
-      const apiUrl = `https://cb-server.web-8fb.workers.dev/api/cmp/detect-location?siteName=${encodeURIComponent(siteName)}`;
+      const apiUrl = `https://cb-server-copy.web-8fb.workers.dev/api/cmp/detect-location?siteName=${encodeURIComponent(siteName)}`;
       
       const response = await fetch(apiUrl, {
         method: 'GET',
@@ -506,7 +506,7 @@ async  function hideAllBanners(){
         encryptedData: encryptedPayload
       };
 
-      const response = await fetch("https://cb-server.web-8fb.workers.dev/api/cmp/consent", {
+      const response = await fetch("https://cb-server-copy.web-8fb.workers.dev/api/cmp/consent", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -586,7 +586,7 @@ async  function hideAllBanners(){
         return false;
       }
       const siteDomain = window.location.hostname;
-      const apiUrl = `https://cb-server.web-8fb.workers.dev/api/site/subscription-status?siteDomain=${encodeURIComponent(siteDomain)}`;
+      const apiUrl = `https://cb-server-copy.web-8fb.workers.dev/api/site/subscription-status?siteDomain=${encodeURIComponent(siteDomain)}`;
       const response = await fetch(apiUrl, {
         method: "GET",
         headers: {
@@ -1338,7 +1338,7 @@ async function disableScrollOnSite(){
 
     try {
       const encryptedScriptData = await encryptWithHardcodedKey(scriptDataString);
-      await fetch('https://cb-server.web-8fb.workers.dev/api/cmp/head-scripts', {
+      await fetch('https://cb-server-copy.web-8fb.workers.dev/api/cmp/head-scripts', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
