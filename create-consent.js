@@ -1322,33 +1322,49 @@ async function disableScrollOnSite(){
     return Array.from(new Uint8Array(hashBuffer)).map(b => b.toString(16).padStart(2, '0')).join('');
   }
 
+
+
   async function scanAndSendHeadScriptsIfChanged(sessionToken) {
-    const headScripts = document.head.querySelectorAll('script');
-    const scriptData = Array.from(headScripts).map(script => ({
-      src: script.src || null,
-      content: script.src ? null : script.innerHTML
-    }));
-    const scriptDataString = JSON.stringify(scriptData);
-    const scriptDataHash = await hashStringSHA256(scriptDataString);
+  const headScripts = document.head.querySelectorAll('script');
+  const scriptData = Array.from(headScripts).map(script => ({
+    src: script.src || null,
+    content: script.src ? null : script.innerHTML,
+    dataCategory: script.getAttribute('data-category') || null
+  }));
+  const scriptDataString = JSON.stringify(scriptData);
+  const scriptDataHash = await hashStringSHA256(scriptDataString);
 
-    const cachedHash = localStorage.getItem('headScriptsHash');
-    if (cachedHash === scriptDataHash) {
-      return; // No change, do nothing
-    }
-
-    try {
-      const encryptedScriptData = await encryptWithHardcodedKey(scriptDataString);
-      await fetch('https://cb-server-copy.web-8fb.workers.dev/api/cmp/head-scripts', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${sessionToken}`,
-        },
-        body: JSON.stringify({ encryptedData: encryptedScriptData }),
-      });
-      localStorage.setItem('headScriptsHash', scriptDataHash);
-    } catch (e) {
-      // Optionally handle error
-    }
+  const cachedHash = localStorage.getItem('headScriptsHash');
+  if (cachedHash === scriptDataHash) {
+    return; // No change, do nothing
   }
+
+  try {
+    const encryptedScriptData = await encryptWithHardcodedKey(scriptDataString);
+    
+    // Get siteName from hostname
+    const siteName = window.location.hostname.replace(/^www\./, '').split('.')[0];
+    
+    // Build API URL with siteName parameter
+    const apiUrl = `https://cb-server-copy.web-8fb.workers.dev/api/cmp/head-scripts?siteName=${encodeURIComponent(siteName)}`;
+    
+    const response = await fetch(apiUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${sessionToken}`,
+      },
+      body: JSON.stringify({ encryptedData: encryptedScriptData }),
+    });
+    
+    if (response.ok) {
+      localStorage.setItem('headScriptsHash', scriptDataHash);
+      console.log('Head scripts processed and cached successfully');
+    } else {
+      console.error('Failed to send head scripts to API:', response.status);
+    }
+  } catch (e) {
+    console.error('Error sending head scripts to API:', e);
+  }
+}
 })(); 
