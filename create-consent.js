@@ -64,9 +64,28 @@
     // Block all scripts without data-category in head only
     blockNonGoogleScripts();
   }
+  function enableAllScriptsWithDataCategory() {
+    // Enable ALL scripts with data-category attribute (regardless of category value) only in head section
+    var scripts = document.head.querySelectorAll('script[type="text/plain"][data-category]');
+    scripts.forEach(function(oldScript) {
+      var newScript = document.createElement('script');
+      for (var i = 0; i < oldScript.attributes.length; i++) {
+        var attr = oldScript.attributes[i];
+        if (attr.name === 'type') {
+          newScript.type = 'text/javascript';
+        } else if (attr.name !== 'data-blocked-by-consent' && attr.name !== 'data-blocked-by-ccpa') {
+          newScript.setAttribute(attr.name, attr.value);
+        }
+      }
+      if (oldScript.innerHTML) {
+        newScript.innerHTML = oldScript.innerHTML;
+      }
+      oldScript.parentNode.replaceChild(newScript, oldScript);
+    });
+  }
   function enableScriptsByCategories(allowedCategories) {
     // Enable scripts based on categories (including Google scripts) only in head section
-    var scripts = document.head.querySelectorAll('script[type="text/plain"][data-blocked-by-consent="true"]');
+    var scripts = document.head.querySelectorAll('script[type="text/plain"][data-category]');
     scripts.forEach(function(oldScript) {
       var category = oldScript.getAttribute('data-category');
       if (category) {
@@ -80,7 +99,7 @@
             var attr = oldScript.attributes[i];
             if (attr.name === 'type') {
               newScript.type = 'text/javascript';
-            } else if (attr.name !== 'data-blocked-by-consent') {
+            } else if (attr.name !== 'data-blocked-by-consent' && attr.name !== 'data-blocked-by-ccpa') {
               newScript.setAttribute(attr.name, attr.value);
             }
           }
@@ -639,9 +658,9 @@ async  function hideAllBanners(){
 
  // --- Main ---
   document.addEventListener('DOMContentLoaded', async function() {
- await   hideAllBanners();
-  await  checkConsentExpiration();
-  await  disableScrollOnSite();
+    await hideAllBanners();
+    await checkConsentExpiration();
+    await disableScrollOnSite();
 
     let canPublish = false;
     let isStaging = false;
@@ -789,9 +808,14 @@ async  function hideAllBanners(){
           }
         } else {
           // GDPR: Use category-based logic
-          if (prefs.Analytics || prefs.Marketing || prefs.Personalization) {
+          if (prefs.Analytics && prefs.Marketing && prefs.Personalization) {
+            // All categories allowed - enable ALL scripts with data-category
+            enableAllScriptsWithDataCategory();
+          } else if (prefs.Analytics || prefs.Marketing || prefs.Personalization) {
+            // Some categories allowed - enable only selected categories
             enableScriptsByCategories(Object.keys(prefs).filter(k => prefs[k]));
           } else {
+            // No categories allowed - block all scripts
             blockScriptsByCategory();
           }
         }
@@ -807,23 +831,8 @@ async  function hideAllBanners(){
           const preferences = { Analytics: true, Marketing: true, Personalization: true, donotshare: false, bannerType: locationData ? locationData.bannerType : undefined };
           setConsentState(preferences, cookieDays);
           
-          // Unblock ALL scripts (including Google scripts) by changing type back to text/javascript
-          const allScripts = document.querySelectorAll('script[type="text/plain"][data-blocked-by-consent="true"]');
-          allScripts.forEach(function(oldScript) {
-            var newScript = document.createElement('script');
-            for (var i = 0; i < oldScript.attributes.length; i++) {
-              var attr = oldScript.attributes[i];
-              if (attr.name === 'type') {
-                newScript.type = 'text/javascript';
-              } else if (attr.name !== 'data-blocked-by-consent') {
-                newScript.setAttribute(attr.name, attr.value);
-              }
-            }
-            if (oldScript.innerHTML) {
-              newScript.innerHTML = oldScript.innerHTML;
-            }
-            oldScript.parentNode.replaceChild(newScript, oldScript);
-          });
+          // Enable ALL scripts with data-category (regardless of category value)
+          enableAllScriptsWithDataCategory();
           
           hideBanner(banners.consent);
           hideBanner(banners.ccpa);
@@ -920,9 +929,14 @@ async  function hideAllBanners(){
           setConsentState(preferences, cookieDays);
           
           // Block/enable scripts based on preferences (including Google scripts)
-          if (preferences.Analytics || preferences.Marketing || preferences.Personalization) {
+          if (preferences.Analytics && preferences.Marketing && preferences.Personalization) {
+            // All categories allowed - enable ALL scripts with data-category
+            enableAllScriptsWithDataCategory();
+          } else if (preferences.Analytics || preferences.Marketing || preferences.Personalization) {
+            // Some categories allowed - enable only selected categories
             enableScriptsByCategories(Object.keys(preferences).filter(k => preferences[k]));
           } else {
+            // No categories allowed - block all scripts
             blockScriptsByCategory();
           }
           
