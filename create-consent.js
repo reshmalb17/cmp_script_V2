@@ -38,7 +38,8 @@
     if (parts.length === 2) return parts.pop().split(';').shift();
   }
   function blockScriptsByCategory() {
-    var scripts = document.querySelectorAll('script[data-category]');
+    // Block scripts only in head section
+    var scripts = document.head.querySelectorAll('script[data-category]');
     scripts.forEach(function(script) {
       var category = script.getAttribute('data-category');
       if (category && script.type !== 'text/plain') {
@@ -60,12 +61,12 @@
       }
     });
     
-    // Block all scripts without data-category
+    // Block all scripts without data-category in head only
     blockNonGoogleScripts();
   }
   function enableScriptsByCategories(allowedCategories) {
-    // Enable scripts based on categories (including Google scripts)
-    var scripts = document.querySelectorAll('script[type="text/plain"][data-blocked-by-consent="true"]');
+    // Enable scripts based on categories (including Google scripts) only in head section
+    var scripts = document.head.querySelectorAll('script[type="text/plain"][data-blocked-by-consent="true"]');
     scripts.forEach(function(oldScript) {
       var category = oldScript.getAttribute('data-category');
       if (category) {
@@ -1218,8 +1219,8 @@ async  function hideAllBanners(){
 
   // --- CCPA-specific script handling functions ---
   function unblockScriptsWithDataCategory() {
-    // CCPA: Unblock ALL scripts with data-category attribute (including Google scripts)
-    var scripts = document.querySelectorAll('script[type="text/plain"][data-category]');
+    // CCPA: Unblock ALL scripts with data-category attribute (including Google scripts) only in head section
+    var scripts = document.head.querySelectorAll('script[type="text/plain"][data-category]');
     scripts.forEach(function(oldScript) {
       var newScript = document.createElement('script');
       for (var i = 0; i < oldScript.attributes.length; i++) {
@@ -1259,8 +1260,8 @@ async function disableScrollOnSite(){
 }
    
   function blockScriptsWithDataCategory() {
-    // CCPA: Block ALL scripts with data-category attribute (including Google scripts)
-    var scripts = document.querySelectorAll('script[data-category]');
+    // CCPA: Block ALL scripts with data-category attribute (including Google scripts) only in head section
+    var scripts = document.head.querySelectorAll('script[data-category]');
     scripts.forEach(function(script) {
       if (script.type !== 'text/plain') {
         script.type = 'text/plain';
@@ -1321,8 +1322,8 @@ async function disableScrollOnSite(){
   }
 
   function blockNonGoogleScripts() {
-    // Block all scripts (including Google scripts)
-    var scripts = document.querySelectorAll('script[src]');
+    // Block all scripts (including Google scripts) only in head section
+    var scripts = document.head.querySelectorAll('script[src]');
     scripts.forEach(function(script) {
         if (script.type !== 'text/plain') {
             script.type = 'text/plain';
@@ -1330,8 +1331,8 @@ async function disableScrollOnSite(){
         }
     });
 
-    // Block inline scripts
-    var inlineScripts = document.querySelectorAll('script:not([src])');
+    // Block inline scripts only in head section
+    var inlineScripts = document.head.querySelectorAll('script:not([src])');
     inlineScripts.forEach(function(script) {
         if (script.innerHTML && script.type !== 'text/plain') {
             script.type = 'text/plain';
