@@ -53,38 +53,43 @@
         
         // Only block if NO categories are essential/necessary
         if (!hasEssentialCategory) {
-          // Check if this is a Google script - don't block Google scripts (let Consent Mode v2 handle them)
-          var isGoogleScript = false;
-          if (script.src) {
-            isGoogleScript = script.src.includes('google') || 
-                           script.src.includes('googletagmanager.com') || 
-                           script.src.includes('google-analytics.com') || 
-                           script.src.includes('googleadservices.com') || 
-                           script.src.includes('doubleclick.net');
-          } else if (script.innerHTML) {
-            isGoogleScript = script.innerHTML.includes('gtag') || 
-                           script.innerHTML.includes('google') || 
-                           script.innerHTML.includes('googletagmanager') || 
-                           script.innerHTML.includes('google-analytics') || 
-                           script.innerHTML.includes('googleadservices') || 
-                           script.innerHTML.includes('doubleclick');
-          }
-          
-          // Only block non-Google scripts by changing type
-          if (!isGoogleScript) {
-            script.type = 'text/plain';
-            script.setAttribute('data-blocked-by-consent', 'true');
-          }
+          // Block ALL scripts with data-category by changing type (including Google scripts)
+          script.type = 'text/plain';
+          script.setAttribute('data-blocked-by-consent', 'true');
         }
       }
     });
     
-    // Block non-Google scripts without data-category (Google scripts handled by Consent Mode v2)
+    // Block non-Google scripts without data-category
     blockNonGoogleScripts();
   }
   function enableScriptsByCategories(allowedCategories) {
-    // Enable non-Google scripts based on categories (Google handled by Consent Mode v2)
-    enableNonGoogleScripts(allowedCategories);
+    // Enable scripts based on categories (including Google scripts)
+    var scripts = document.querySelectorAll('script[type="text/plain"][data-blocked-by-consent="true"]');
+    scripts.forEach(function(oldScript) {
+      var category = oldScript.getAttribute('data-category');
+      if (category) {
+        var categories = category.split(',').map(function(cat) { return cat.trim(); });
+        var shouldEnable = categories.some(function(cat) { 
+          return allowedCategories.includes(cat); 
+        });
+        if (shouldEnable) {
+          var newScript = document.createElement('script');
+          for (var i = 0; i < oldScript.attributes.length; i++) {
+            var attr = oldScript.attributes[i];
+            if (attr.name === 'type') {
+              newScript.type = 'text/javascript';
+            } else if (attr.name !== 'data-blocked-by-consent') {
+              newScript.setAttribute(attr.name, attr.value);
+            }
+          }
+          if (oldScript.innerHTML) {
+            newScript.innerHTML = oldScript.innerHTML;
+          }
+          oldScript.parentNode.replaceChild(newScript, oldScript);
+        }
+      }
+    });
   }
   function updateGtagConsent(preferences) {
     if (typeof gtag === "function") {
@@ -1333,56 +1338,6 @@ async function disableScrollOnSite(){
                 script.setAttribute('data-blocked-by-consent', 'true');
             }
         }
-    });
-  }
-  
-  function enableNonGoogleScripts(allowedCategories) {
-    // Enable non-Google scripts based on categories
-    var scripts = document.querySelectorAll('script[type="text/plain"][data-blocked-by-consent="true"]');
-    scripts.forEach(function(oldScript) {
-      // Skip Google scripts (they're handled by Consent Mode v2)
-      var isGoogleScript = false;
-      if (oldScript.src) {
-        isGoogleScript = oldScript.src.includes('google') || 
-                       oldScript.src.includes('googletagmanager.com') || 
-                       oldScript.src.includes('google-analytics.com') || 
-                       oldScript.src.includes('googleadservices.com') || 
-                       oldScript.src.includes('doubleclick.net');
-      } else if (oldScript.innerHTML) {
-        isGoogleScript = oldScript.innerHTML.includes('gtag') || 
-                       oldScript.innerHTML.includes('google') || 
-                       oldScript.innerHTML.includes('googletagmanager') || 
-                       oldScript.innerHTML.includes('google-analytics') || 
-                       oldScript.innerHTML.includes('googleadservices') || 
-                       oldScript.innerHTML.includes('doubleclick');
-      }
-      
-      if (isGoogleScript) {
-        return; // Don't unblock Google scripts - let Consent Mode v2 handle them
-      }
-      
-      var category = oldScript.getAttribute('data-category');
-      if (category) {
-        var categories = category.split(',').map(function(cat) { return cat.trim(); });
-        var shouldEnable = categories.some(function(cat) { 
-          return allowedCategories.includes(cat); 
-        });
-        if (shouldEnable) {
-          var newScript = document.createElement('script');
-          for (var i = 0; i < oldScript.attributes.length; i++) {
-            var attr = oldScript.attributes[i];
-            if (attr.name === 'type') {
-              newScript.type = 'text/javascript';
-            } else if (attr.name !== 'data-blocked-by-consent') {
-              newScript.setAttribute(attr.name, attr.value);
-            }
-          }
-          if (oldScript.innerHTML) {
-            newScript.innerHTML = oldScript.innerHTML;
-          }
-          oldScript.parentNode.replaceChild(newScript, oldScript);
-        }
-      }
     });
   }
 })(); 
