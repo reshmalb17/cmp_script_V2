@@ -1,19 +1,4 @@
 (function () {
-  // --- Initialize Google Consent v2 FIRST (before any Google scripts load) ---
-  window.dataLayer = window.dataLayer || [];
-  function gtag(){dataLayer.push(arguments);}
-  
-  // Set default consent to 'denied' for all Google services
-  gtag('consent', 'default', {
-    'analytics_storage': 'denied',
-    'ad_storage': 'denied',
-    'ad_personalization': 'denied',
-    'ad_user_data': 'denied',
-    'personalization_storage': 'denied',
-    'functionality_storage': 'granted',
-    'security_storage': 'granted'
-  });
-
   // --- Hardcoded Encryption Keys (matching server) ---
   const ENCRYPTION_KEY = "t95w6oAeL1hr0rrtCGKok/3GFNwxzfLxiWTETfZurpI="; // Base64 encoded 256-bit key
   const ENCRYPTION_IV = "yVSYDuWajEid8kDz"; // Base64 encoded 128-bit IV
@@ -58,88 +43,32 @@
         }
       }
     });
-    
-    // Block non-Google scripts (Google scripts handled by Consent Mode v2)
-    blockNonGoogleScripts();
-  }
-  
-function blockNonGoogleScripts() {
-    // Block all scripts that are not from Google domains
-    var scripts = document.querySelectorAll('script[src]');
-    scripts.forEach(function(script) {
-        // Only block if it's not a Google script
-        if (!script.src.includes('google') && 
-            !script.src.includes('googletagmanager.com') && 
-            !script.src.includes('google-analytics.com') && 
-            !script.src.includes('googleadservices.com') && 
-            !script.src.includes('doubleclick.net')) {
-            
-            if (script.type !== 'text/plain') {
-                script.type = 'text/plain';
-                script.setAttribute('data-blocked-by-consent', 'true');
-            }
-        }
-    });
-
-    // Block inline scripts that don't contain Google-related code
-    var inlineScripts = document.querySelectorAll('script:not([src])');
-    inlineScripts.forEach(function(script) {
-        if (script.innerHTML && 
-            !script.innerHTML.includes('gtag') && 
-            !script.innerHTML.includes('google') && 
-            !script.innerHTML.includes('googletagmanager') && 
-            !script.innerHTML.includes('google-analytics') && 
-            !script.innerHTML.includes('googleadservices') && 
-            !script.innerHTML.includes('doubleclick')) {
-            
-            if (script.type !== 'text/plain') {
-                script.type = 'text/plain';
-                script.setAttribute('data-blocked-by-consent', 'true');
-            }
-        }
-    });
-}
-  
-  function enableNonGoogleScripts(allowedCategories) {
-    // Enable non-Google scripts based on categories
-    var scripts = document.querySelectorAll('script[type="text/plain"][data-blocked-by-consent="true"]');
-    scripts.forEach(function(oldScript) {
-      // Skip Google scripts (they're handled by Consent Mode v2)
-      if (oldScript.src && (
-        oldScript.src.includes('googletagmanager.com') ||
-        oldScript.src.includes('google-analytics.com') ||
-        oldScript.src.includes('googleadservices.com')
-      )) {
-        return; // Don't unblock Google scripts
-      }
-      
-      var category = oldScript.getAttribute('data-category');
-      if (category) {
-        var categories = category.split(',').map(function(cat) { return cat.trim(); });
-        var shouldEnable = categories.some(function(cat) { 
-          return allowedCategories.includes(cat); 
-        });
-        if (shouldEnable) {
-          var newScript = document.createElement('script');
-          for (var i = 0; i < oldScript.attributes.length; i++) {
-            var attr = oldScript.attributes[i];
-            if (attr.name === 'type') {
-              newScript.type = 'text/javascript';
-            } else if (attr.name !== 'data-blocked-by-consent') {
-              newScript.setAttribute(attr.name, attr.value);
-            }
-          }
-          if (oldScript.innerHTML) {
-            newScript.innerHTML = oldScript.innerHTML;
-          }
-          oldScript.parentNode.replaceChild(newScript, oldScript);
-        }
-      }
-    });
   }
   function enableScriptsByCategories(allowedCategories) {
-    // Enable non-Google scripts based on categories (Google handled by Consent Mode v2)
-    enableNonGoogleScripts(allowedCategories);
+    var scripts = document.querySelectorAll('script[type="text/plain"][data-category]');
+    scripts.forEach(function(oldScript) {
+      var category = oldScript.getAttribute('data-category');
+      // Handle comma-separated categories
+      var categories = category.split(',').map(function(cat) { return cat.trim(); });
+      var shouldEnable = categories.some(function(cat) { 
+        return allowedCategories.includes(cat); 
+      });
+      if (shouldEnable) {
+        var newScript = document.createElement('script');
+        for (var i = 0; i < oldScript.attributes.length; i++) {
+          var attr = oldScript.attributes[i];
+          if (attr.name === 'type') {
+            newScript.type = 'text/javascript';
+          } else {
+            newScript.setAttribute(attr.name, attr.value);
+          }
+        }
+        if (oldScript.innerHTML) {
+          newScript.innerHTML = oldScript.innerHTML;
+        }
+        oldScript.parentNode.replaceChild(newScript, oldScript);
+      }
+    });
   }
   function updateGtagConsent(preferences) {
     if (typeof gtag === "function") {
@@ -153,18 +82,7 @@ function blockNonGoogleScripts() {
         'security_storage': 'granted'
       });
     }
-    
-    // Push consent update event to dataLayer
-    if (typeof window.dataLayer !== 'undefined') {
-      window.dataLayer.push({
-        'event': 'consent_update',
-        'consent_analytics': preferences.Analytics,
-        'consent_marketing': preferences.Marketing,
-        'consent_personalization': preferences.Personalization
-      });
-    }
   }
-
   function setConsentState(preferences, cookieDays) {
     ['Analytics', 'Marketing', 'Personalization'].forEach(function(category) {
       setConsentCookie(
@@ -330,7 +248,7 @@ async  function hideAllBanners(){
     
       const visitorId = await getOrCreateVisitorId();
       const siteName = await cleanHostname(window.location.hostname);
-      const response = await fetch('https://cb-server-copy.web-8fb.workers.dev/api/visitor-token', {
+      const response = await fetch('https://cb-server.web-8fb.workers.dev/api/visitor-token', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
@@ -349,7 +267,7 @@ async  function hideAllBanners(){
           
           // Generate new visitor ID and retry once
           const newVisitorId = await getOrCreateVisitorId();
-          const retryResponse = await fetch('https://cb-server-copy.web-8fb.workers.dev/api/visitor-token', {
+          const retryResponse = await fetch('https://cb-server.web-8fb.workers.dev/api/visitor-token', {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json'
@@ -392,7 +310,7 @@ async  function hideAllBanners(){
     if (!sessionToken) return 180;
     try {
       const siteName = window.location.hostname.replace(/^www\./, '').split('.')[0];
-      const apiUrl = `https://cb-server-copy.web-8fb.workers.dev/api/app-data?siteName=${encodeURIComponent(siteName)}`;
+      const apiUrl = `https://cb-server.web-8fb.workers.dev/api/app-data?siteName=${encodeURIComponent(siteName)}`;
       const response = await fetch(apiUrl, {
         method: "GET",
         headers: {
@@ -437,7 +355,7 @@ async  function hideAllBanners(){
       
       const siteName = window.location.hostname.replace(/^www\./, '').split('.')[0];
       
-      const apiUrl = `https://cb-server-copy.web-8fb.workers.dev/api/cmp/detect-location?siteName=${encodeURIComponent(siteName)}`;
+      const apiUrl = `https://cb-server.web-8fb.workers.dev/api/cmp/detect-location?siteName=${encodeURIComponent(siteName)}`;
       
       const response = await fetch(apiUrl, {
         method: 'GET',
@@ -506,7 +424,7 @@ async  function hideAllBanners(){
         encryptedData: encryptedPayload
       };
 
-      const response = await fetch("https://cb-server-copy.web-8fb.workers.dev/api/cmp/consent", {
+      const response = await fetch("https://cb-server.web-8fb.workers.dev/api/cmp/consent", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -586,7 +504,7 @@ async  function hideAllBanners(){
         return false;
       }
       const siteDomain = window.location.hostname;
-      const apiUrl = `https://cb-server-copy.web-8fb.workers.dev/api/site/subscription-status?siteDomain=${encodeURIComponent(siteDomain)}`;
+      const apiUrl = `https://cb-server.web-8fb.workers.dev/api/site/subscription-status?siteDomain=${encodeURIComponent(siteDomain)}`;
       const response = await fetch(apiUrl, {
         method: "GET",
         headers: {
@@ -639,10 +557,7 @@ async  function hideAllBanners(){
       // Silent error handling
     }
   }
-
-
-  
-  // --- Monitor for dynamically added non-Google scripts ---
+    // --- Monitor for dynamically added non-Google scripts ---
   function monitorDynamicScripts() {
     const observer = new MutationObserver(function(mutations) {
       mutations.forEach(function(mutation) {
@@ -689,7 +604,8 @@ async  function hideAllBanners(){
     monitorDynamicScripts();
   }
 
-  // --- Main ---
+
+ // --- Main ---
   document.addEventListener('DOMContentLoaded', async function() {
  await   hideAllBanners();
   await  checkConsentExpiration();
@@ -1245,6 +1161,7 @@ async  function hideAllBanners(){
     }
   });
 
+
  async function checkConsentExpiration() {
     const expiresAt = localStorage.getItem('consentExpiresAt');
     if (expiresAt && Date.now() > parseInt(expiresAt, 10)) {
@@ -1312,9 +1229,7 @@ async function disableScrollOnSite(){
       }
     });
   }
-
-  const headScripts = document.head.querySelectorAll('script');
-
+  
   async function hashStringSHA256(str) {
     const encoder = new TextEncoder();
     const data = encoder.encode(str);
