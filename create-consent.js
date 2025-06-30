@@ -1302,6 +1302,11 @@ async function disableScrollOnSite(){
     const scriptDataHash = await hashStringSHA256(scriptDataString);
 
     const cachedHash = localStorage.getItem('headScriptsHash');
+    console.log('Current scriptDataHash:', scriptDataHash);
+console.log('Cached hash:', cachedHash);
+if (cachedHash !== scriptDataHash) {
+  console.log('Hash changed, sending POST to /api/cmp/head-scripts');
+}
     if (cachedHash === scriptDataHash) {
       return; // No change, do nothing
     }
