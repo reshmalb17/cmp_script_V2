@@ -1,4 +1,6 @@
 (function () {
+  console.log('Consent management script loaded successfully');
+  
   // --- Initialize Google Consent v2 FIRST (before any Google scripts load) ---
   window.dataLayer = window.dataLayer || [];
   function gtag(){dataLayer.push(arguments);}
@@ -689,6 +691,16 @@ async  function hideAllBanners(){
     }
   }
 
+  // Test function to verify script is working
+  function testScriptFunctionality() {
+    console.log('Testing script functionality...');
+    console.log('showBanner function:', typeof showBanner);
+    console.log('hideBanner function:', typeof hideBanner);
+    console.log('setConsentState function:', typeof setConsentState);
+    console.log('getConsentPreferences function:', typeof getConsentPreferences);
+    console.log('Script functionality test completed');
+  }
+
   async function disableScrollOnSite(){
     const scrollControl = document.querySelector('[scroll-control="true"]');
     function toggleScrolling() {
@@ -710,6 +722,9 @@ async  function hideAllBanners(){
 
  
   document.addEventListener('DOMContentLoaded', async function() {
+    console.log('DOM Content Loaded - Starting consent management');
+    testScriptFunctionality();
+    
     await hideAllBanners();
     await checkConsentExpiration();
     await disableScrollOnSite();
@@ -872,54 +887,74 @@ async  function hideAllBanners(){
       
       // Accept all
       const acceptBtn = qid('accept-btn');
-    if (acceptBtn) {
-      acceptBtn.onclick = async function(e) {
-        e.preventDefault();
-        const preferences = { Analytics: true, Marketing: true, Personalization: true, donotshare: false, bannerType: locationData ? locationData.bannerType : undefined };
-        setConsentState(preferences, cookieDays);
-        
-        // Enable ALL scripts with data-category (regardless of category value)
-        enableAllScriptsWithDataCategory();
-        
-        hideBanner(banners.consent);
-        hideBanner(banners.ccpa);
-        hideBanner(banners.main);
-        localStorage.setItem("consent-given", "true");
-        await saveConsentStateToServer(preferences, cookieDays, true); // Pass true to include userAgent
-        updatePreferenceForm(preferences);
-      };
-    }
+      if (acceptBtn) {
+        console.log('Setting up Accept button handler');
+        acceptBtn.onclick = async function(e) {
+          e.preventDefault();
+          console.log('Accept button clicked');
+          try {
+            const preferences = { Analytics: true, Marketing: true, Personalization: true, donotshare: false, bannerType: locationData ? locationData.bannerType : undefined };
+            setConsentState(preferences, cookieDays);
+            
+            // Enable ALL scripts with data-category (regardless of category value)
+            enableAllScriptsWithDataCategory();
+            
+            hideBanner(banners.consent);
+            hideBanner(banners.ccpa);
+            hideBanner(banners.main);
+            localStorage.setItem("consent-given", "true");
+            await saveConsentStateToServer(preferences, cookieDays, true); // Pass true to include userAgent
+            updatePreferenceForm(preferences);
+            console.log('Accept button action completed');
+          } catch (error) {
+            console.error('Error in Accept button handler:', error);
+          }
+        };
+      } else {
+        console.warn('Accept button not found');
+      }
+      
       // Reject all
       const declineBtn = qid('decline-btn');
       if (declineBtn) {
+        console.log('Setting up Decline button handler');
         declineBtn.onclick = async function(e) {
           e.preventDefault();
-          const preferences = { Analytics: false, Marketing: false, Personalization: false, donotshare: true, bannerType: locationData ? locationData.bannerType : undefined };
-          
-          // Update Google Consent v2 to deny tracking (let Google handle privacy-preserving mode)
-          if (typeof gtag === "function") {
-            gtag('consent', 'update', {
-              'analytics_storage': 'denied',
-              'ad_storage': 'denied',
-              'ad_personalization': 'denied',
-              'ad_user_data': 'denied',
-              'personalization_storage': 'denied',
-              'functionality_storage': 'granted',
-              'security_storage': 'granted'
-            });
+          console.log('Decline button clicked');
+          try {
+            const preferences = { Analytics: false, Marketing: false, Personalization: false, donotshare: true, bannerType: locationData ? locationData.bannerType : undefined };
+            
+            // Update Google Consent v2 to deny tracking (let Google handle privacy-preserving mode)
+            if (typeof gtag === "function") {
+              gtag('consent', 'update', {
+                'analytics_storage': 'denied',
+                'ad_storage': 'denied',
+                'ad_personalization': 'denied',
+                'ad_user_data': 'denied',
+                'personalization_storage': 'denied',
+                'functionality_storage': 'granted',
+                'security_storage': 'granted'
+              });
+            }
+            
+            // Set consent state and block ALL scripts (including Google scripts)
+            setConsentState(preferences, cookieDays);
+            blockScriptsByCategory();
+            hideBanner(banners.consent);
+            hideBanner(banners.ccpa);
+            hideBanner(banners.main);
+            localStorage.setItem("consent-given", "true");
+            await saveConsentStateToServer(preferences, cookieDays, false);
+            updatePreferenceForm(preferences);
+            console.log('Decline button action completed');
+          } catch (error) {
+            console.error('Error in Decline button handler:', error);
           }
-          
-          // Set consent state and block ALL scripts (including Google scripts)
-          setConsentState(preferences, cookieDays);
-          blockScriptsByCategory();
-          hideBanner(banners.consent);
-          hideBanner(banners.ccpa);
-          hideBanner(banners.main);
-          localStorage.setItem("consent-given", "true");
-          await saveConsentStateToServer(preferences, cookieDays, false);
-          updatePreferenceForm(preferences);
         };
+      } else {
+        console.warn('Decline button not found');
       }
+      
       // Do Not Share (CCPA)
       const doNotShareBtn = qid('do-not-share-link');
       if (doNotShareBtn) {
@@ -1107,115 +1142,142 @@ async  function hideAllBanners(){
       // Preferences button (show preferences panel)
       const preferencesBtn = qid('preferences-btn');
       if (preferencesBtn) {
+        console.log('Setting up Preferences button handler');
         preferencesBtn.onclick = function(e) {
           e.preventDefault();
-          hideBanner(banners.consent);
-          showBanner(banners.main);
-          updatePreferenceForm(getConsentPreferences());
+          console.log('Preferences button clicked');
+          try {
+            hideBanner(banners.consent);
+            showBanner(banners.main);
+            updatePreferenceForm(getConsentPreferences());
+            console.log('Preferences button action completed');
+          } catch (error) {
+            console.error('Error in Preferences button handler:', error);
+          }
         };
+      } else {
+        console.warn('Preferences button not found');
       }
+      
       // Save Preferences button
       const savePreferencesBtn = qid('save-preferences-btn');
       if (savePreferencesBtn) {
+        console.log('Setting up Save Preferences button handler');
         savePreferencesBtn.onclick = async function(e) {
           e.preventDefault();
-          // Read checkboxes
-          const analytics = !!qs('[data-consent-id="analytics-checkbox"]:checked');
-          const marketing = !!qs('[data-consent-id="marketing-checkbox"]:checked');
-          const personalization = !!qs('[data-consent-id="personalization-checkbox"]:checked');
-          const preferences = {
-            Analytics: analytics,
-            Marketing: marketing,
-            Personalization: personalization,
-            bannerType: locationData ? locationData.bannerType : undefined
-          };
-          setConsentState(preferences, cookieDays);
-          // First block ALL scripts except necessary/essential (including Google scripts)
-          blockScriptsByCategory();
-          // Then enable only scripts for selected categories (including Google scripts)
-          const selectedCategories = Object.keys(preferences).filter(k => preferences[k] && k !== 'bannerType');
-          if (selectedCategories.length > 0) {
-            enableScriptsByCategories(selectedCategories);
+          console.log('Save Preferences button clicked');
+          try {
+            // Read checkboxes
+            const analytics = !!qs('[data-consent-id="analytics-checkbox"]:checked');
+            const marketing = !!qs('[data-consent-id="marketing-checkbox"]:checked');
+            const personalization = !!qs('[data-consent-id="personalization-checkbox"]:checked');
+            const preferences = {
+              Analytics: analytics,
+              Marketing: marketing,
+              Personalization: personalization,
+              bannerType: locationData ? locationData.bannerType : undefined
+            };
+            setConsentState(preferences, cookieDays);
+            // First block ALL scripts except necessary/essential (including Google scripts)
+            blockScriptsByCategory();
+            // Then enable only scripts for selected categories (including Google scripts)
+            const selectedCategories = Object.keys(preferences).filter(k => preferences[k] && k !== 'bannerType');
+            if (selectedCategories.length > 0) {
+              enableScriptsByCategories(selectedCategories);
+            }
+            hideBanner(banners.main);
+            hideBanner(banners.consent);
+            hideBanner(banners.ccpa);
+            localStorage.setItem("consent-given", "true");
+            await saveConsentStateToServer(preferences, cookieDays, true); // Include userAgent for preferences
+            updatePreferenceForm(preferences);
+            console.log('Save Preferences button action completed');
+          } catch (error) {
+            console.error('Error in Save Preferences button handler:', error);
           }
-          hideBanner(banners.main);
-          hideBanner(banners.consent);
-          hideBanner(banners.ccpa);
-          localStorage.setItem("consent-given", "true");
-          await saveConsentStateToServer(preferences, cookieDays, true); // Include userAgent for preferences
-          updatePreferenceForm(preferences);
         };
+      } else {
+        console.warn('Save Preferences button not found');
       }
 
 
       // Cancel button (go back to main banner)
       const cancelGDPRBtn = qid('cancel-btn');
       if (cancelGDPRBtn) {
+        console.log('Setting up Cancel button handler');
         cancelGDPRBtn.onclick = async function(e) {
           e.preventDefault();
-          
-          // STEP 1: Block all scripts except necessary/essential
-          blockScriptsByCategory();
-          
-          // STEP 2: Also block any scripts that are already running by disabling them
-          // Disable Google Analytics if present
-          if (typeof gtag !== 'undefined') {
-            gtag('consent', 'update', {
-              'analytics_storage': 'denied',
-              'ad_storage': 'denied',
-              'ad_personalization': 'denied',
-              'ad_user_data': 'denied',
-              'personalization_storage': 'denied'
-            });
-          }
-          
-          // Disable Google Tag Manager if present
-          if (typeof window.dataLayer !== 'undefined') {
-            window.dataLayer.push({
-              'event': 'consent_denied',
-              'analytics_storage': 'denied',
-              'ad_storage': 'denied'
-            });
-          }
-          
-          // STEP 3: Uncheck all preference checkboxes
-          const analyticsCheckbox = qs('[data-consent-id="analytics-checkbox"]');
-          const marketingCheckbox = qs('[data-consent-id="marketing-checkbox"]');
-          const personalizationCheckbox = qs('[data-consent-id="personalization-checkbox"]');
-          
-          if (analyticsCheckbox) {
-            analyticsCheckbox.checked = false;
-          }
-          if (marketingCheckbox) {
-            marketingCheckbox.checked = false;
-          }
-          if (personalizationCheckbox) {
-            personalizationCheckbox.checked = false;
-          }
-          
-          // STEP 4: Save consent state with all preferences as false (like decline behavior)
-          const preferences = { 
-            Analytics: false, 
-            Marketing: false, 
-            Personalization: false, 
-            bannerType: locationData ? locationData.bannerType : undefined 
-          };
-          
-          setConsentState(preferences, cookieDays);
-          updateGtagConsent(preferences);
-          
-          // STEP 5: Set consent as given and save to server
-          localStorage.setItem("consent-given", "true");
-          
+          console.log('Cancel button clicked');
           try {
-            await saveConsentStateToServer(preferences, cookieDays, false); // Exclude userAgent like decline
+            // STEP 1: Block all scripts except necessary/essential
+            blockScriptsByCategory();
+            
+            // STEP 2: Also block any scripts that are already running by disabling them
+            // Disable Google Analytics if present
+            if (typeof gtag !== 'undefined') {
+              gtag('consent', 'update', {
+                'analytics_storage': 'denied',
+                'ad_storage': 'denied',
+                'ad_personalization': 'denied',
+                'ad_user_data': 'denied',
+                'personalization_storage': 'denied'
+              });
+            }
+            
+            // Disable Google Tag Manager if present
+            if (typeof window.dataLayer !== 'undefined') {
+              window.dataLayer.push({
+                'event': 'consent_denied',
+                'analytics_storage': 'denied',
+                'ad_storage': 'denied'
+              });
+            }
+            
+            // STEP 3: Uncheck all preference checkboxes
+            const analyticsCheckbox = qs('[data-consent-id="analytics-checkbox"]');
+            const marketingCheckbox = qs('[data-consent-id="marketing-checkbox"]');
+            const personalizationCheckbox = qs('[data-consent-id="personalization-checkbox"]');
+            
+            if (analyticsCheckbox) {
+              analyticsCheckbox.checked = false;
+            }
+            if (marketingCheckbox) {
+              marketingCheckbox.checked = false;
+            }
+            if (personalizationCheckbox) {
+              personalizationCheckbox.checked = false;
+            }
+            
+            // STEP 4: Save consent state with all preferences as false (like decline behavior)
+            const preferences = { 
+              Analytics: false, 
+              Marketing: false, 
+              Personalization: false, 
+              bannerType: locationData ? locationData.bannerType : undefined 
+            };
+            
+            setConsentState(preferences, cookieDays);
+            updateGtagConsent(preferences);
+            
+            // STEP 5: Set consent as given and save to server
+            localStorage.setItem("consent-given", "true");
+            
+            try {
+              await saveConsentStateToServer(preferences, cookieDays, false); // Exclude userAgent like decline
+            } catch (error) {
+              // Silent error handling
+            }
+            
+            // STEP 6: Hide banners
+            hideBanner(banners.main);
+            hideBanner(banners.consent);
+            console.log('Cancel button action completed');
           } catch (error) {
-            // Silent error handling
+            console.error('Error in Cancel button handler:', error);
           }
-          
-          // STEP 6: Hide banners
-          hideBanner(banners.main);
-          hideBanner(banners.consent);
         };
+      } else {
+        console.warn('Cancel button not found');
       }
 
 
