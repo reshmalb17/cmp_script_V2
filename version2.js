@@ -786,9 +786,15 @@ async  function hideAllBanners(){
       canPublish = await checkPublishingStatus();
       isStaging = isStagingHostname();
       
+      // Only remove consent elements if not published AND not in staging mode
       if (!canPublish && !isStaging) {
         removeConsentElements();
         return;
+      }
+      
+      // In staging mode, ensure all consent elements are available for testing
+      if (isStaging) {
+        console.log('Staging mode detected - all banners will be available for testing');
       }
     } catch (error) {
       // Don't immediately reload on error, try to continue
@@ -819,8 +825,19 @@ async  function hideAllBanners(){
       return;
     }
 
-    // Only show banners if consent not given AND location data is available
-    if (!consentGiven && locationData) {
+    // In staging mode, if location detection fails, create a default location for testing
+    if (isStaging && !locationData) {
+      console.log('Staging mode: Location detection failed, using default GDPR banner for testing');
+      locationData = {
+        country: 'US',
+        continent: 'NA',
+        state: null,
+        bannerType: 'GDPR'
+      };
+    }
+
+    // Show banners if consent not given AND (location data is available OR in staging mode)
+    if (!consentGiven && (locationData || isStaging)) {
       if (["CCPA", "VCDPA", "CPA", "CTDPA", "UCPA"].includes(locationData.bannerType)) {
         // US Privacy Laws: Unblock all scripts initially (opt-out model)
         unblockScriptsWithDataCategory();
@@ -905,13 +922,27 @@ async  function hideAllBanners(){
           hideBanner(initialBanner);
         }
         
-        // Show CCPA preference panel instead of main consent banner
+        // Try to show CCPA preference panel first
         const ccpaPreferencePanel = document.querySelector('.consentbit-ccpa_preference');
         if (ccpaPreferencePanel) {
           showBanner(ccpaPreferencePanel);
           
           // Update CCPA preference form with saved preferences
           updateCCPAPreferenceForm(getConsentPreferences());
+        } else {
+          // Fallback: If preference panel is not available (removed by removeConsentElements), 
+          // show the initial CCPA banner instead
+          const fallbackBanner = document.getElementById('initial-consent-banner');
+          if (fallbackBanner) {
+            showBanner(fallbackBanner);
+            
+            // Force display with additional methods if needed
+            fallbackBanner.style.display = "block";
+            fallbackBanner.style.visibility = "visible";
+            fallbackBanner.hidden = false;
+            fallbackBanner.classList.remove("hidden");
+            fallbackBanner.classList.add("show-banner");
+          }
         }
       };
     }
