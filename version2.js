@@ -777,9 +777,7 @@ async  function hideAllBanners(){
 
  
   document.addEventListener('DOMContentLoaded', async function() {
-    console.log('DOM Content Loaded - Starting consent management');
-    testScriptFunctionality();
-    debugPageElements();
+    console.log('DOM Content Loaded - Starting consent management'); 
     loadAndDisplaySavedPreferences(); // Load saved preferences
     
     await hideAllBanners();
@@ -792,40 +790,38 @@ async  function hideAllBanners(){
     
     // Set up toggle consent button FIRST (outside conditional blocks)
     const toggleConsentBtn = document.getElementById('toggle-consent-btn');
+    console.log('Debug - toggleConsentBtn found:', !!toggleConsentBtn);
     
     if (toggleConsentBtn) {
+      console.log('Setting up toggle-consent-btn handler');
       toggleConsentBtn.onclick = function(e) {
         e.preventDefault();
+        console.log('Toggle consent button clicked');
         
         // Find banner elements
         const consentBanner = document.getElementById("consent-banner");
         const ccpaBanner = document.getElementById("initial-consent-banner");
         const mainBanner = document.getElementById("main-banner");
         
+        console.log('Debug - consentBanner found:', !!consentBanner);
+        console.log('Debug - ccpaBanner found:', !!ccpaBanner);
+        console.log('Debug - mainBanner found:', !!mainBanner);
+        
+        console.log("1.location data",locationData)
         // Force show appropriate banner
         if (locationData && locationData.bannerType === "CCPA" && ccpaBanner) {
+          console.log('Showing CCPA banner via toggle button');
           hideAllBanners();
-          showBanner(ccpaBanner);
-          
-          // Force display with additional methods if needed
-          ccpaBanner.style.display = "block";
-          ccpaBanner.style.visibility = "visible";
-          ccpaBanner.hidden = false;
-          ccpaBanner.classList.remove("hidden");
-          ccpaBanner.classList.add("show-banner");
+          showBanner(ccpaBanner);          
+         
           
           // Update CCPA preference form with saved preferences
           updateCCPAPreferenceForm(getConsentPreferences());
         } else if (consentBanner) {
+          console.log('Showing GDPR banner via toggle button');
           hideAllBanners();
           showBanner(consentBanner);
-          
-          // Force display with additional methods if needed
-          consentBanner.style.display = "block";
-          consentBanner.style.visibility = "visible";
-          consentBanner.hidden = false;
-          consentBanner.classList.remove("hidden");
-          consentBanner.classList.add("show-banner");
+        
         }
         
         // Update preferences if function exists
@@ -833,8 +829,27 @@ async  function hideAllBanners(){
           updatePreferenceForm(getConsentPreferences());
         }
       };
+    } else {
+      console.warn('Toggle consent button not found');
     }
     
+    // Check staging mode early
+    isStaging = isStagingHostname();
+    console.log('Debug - Early isStaging check:', isStaging);
+    
+    // If in staging mode, show banner immediately for testing
+    if (isStaging) {
+      console.log('Staging mode detected early - showing banner for testing');
+      // Show GDPR banner by default in staging mode
+      const consentBanner = document.getElementById('consent-banner');
+      if (consentBanner) {
+        showBanner(consentBanner);
+        console.log('GDPR banner shown in staging mode (early)');
+      } else {
+        console.log('GDPR banner not found for early display');
+      }
+    }
+
     try {
       const token = await getVisitorSessionToken();
       if (!token) {
@@ -856,7 +871,6 @@ async  function hideAllBanners(){
         await scanAndSendHeadScriptsIfChanged(token);
       }
       canPublish = await checkPublishingStatus();
-      isStaging = isStagingHostname();
       
       // Only remove consent elements if not published AND not in staging mode
       if (!canPublish && !isStaging) {
@@ -890,12 +904,25 @@ async  function hideAllBanners(){
     const prefs = getConsentPreferences();
     updatePreferenceForm(prefs);
 
+ 
+
+    // If consent is already given, hide all banners and do not show any
+    if (consentGiven === "true") {
+      console.log('Consent already given - hiding all banners');
+      await hideAllBanners();
+      // Do not show any banner unless user clicks the icon
+      return;
+    }
+    
+    // Note: Staging mode banner display is handled earlier in the code
+    console.log('Staging mode banner display already handled earlier');
+
     // Set up button handlers ALWAYS (before consent check)
     function qid(id) { return document.getElementById(id); }
     function qs(sel) { return document.querySelector(sel); }
     
     // Accept all
-    const acceptBtn = qid('accept-btn');
+    const acceptBtn =document.getElementById('accept-btn');
     if (acceptBtn) {
       console.log('Setting up Accept button handler');
       acceptBtn.onclick = async function(e) {
@@ -932,7 +959,7 @@ async  function hideAllBanners(){
     }
     
     // Reject all
-    const declineBtn = qid('decline-btn');
+    const declineBtn = document.getElementById('decline-btn');
     if (declineBtn) {
       console.log('Setting up Decline button handler');
       declineBtn.onclick = async function(e) {
@@ -982,7 +1009,7 @@ async  function hideAllBanners(){
     }
     
     // Preferences button (show preferences panel)
-    const preferencesBtn = qid('preferences-btn');
+    const preferencesBtn = document.getElementById('preferences-btn');
     if (preferencesBtn) {
       console.log('Setting up Preferences button handler');
       preferencesBtn.onclick = function(e) {
@@ -1014,33 +1041,11 @@ async  function hideAllBanners(){
       };
     } else {
       console.warn('Preferences button not found - checked for id: preferences-btn');
-      // Try alternative selectors
-      const altPreferencesBtn = document.querySelector('.consentbit-banner-button-preference') || 
-                               document.querySelector('[class*="preference"]');
-      if (altPreferencesBtn) {
-        console.log('Found preferences button with alternative selector');
-        altPreferencesBtn.onclick = function(e) {
-          e.preventDefault();
-          console.log('Preferences button clicked (alternative)');
-          try {
-            const consentBanner = document.getElementById('consent-banner');
-            if (consentBanner) {
-              hideBanner(consentBanner);
-            }
-            const mainBanner = document.getElementById('main-banner');
-            if (mainBanner) {
-              showBanner(mainBanner);
-            }
-            updatePreferenceForm(getConsentPreferences());
-          } catch (error) {
-            console.error('Error in alternative Preferences button handler:', error);
-          }
-        };
-      }
+    
     }
 
     // Do Not Share (CCPA)
-    const doNotShareBtn = qid('do-not-share-link');
+    const doNotShareBtn = document.getElementById('do-not-share-link');
     if (doNotShareBtn) {
       console.log('Setting up Do Not Share button handler');
       doNotShareBtn.onclick = function(e) {
@@ -1073,13 +1078,6 @@ async  function hideAllBanners(){
       console.warn('Do Not Share button not found - checked for id: do-not-share-link');
     }
 
-    // If consent is already given, hide all banners and do not show any
-    if (consentGiven === "true") {
-      await hideAllBanners();
-      // Do not show any banner unless user clicks the icon
-      return;
-    }
-    
     // CCPA Preference Accept button
     const ccpaPreferenceAcceptBtn = document.getElementById('consebit-ccpa-prefrence-accept');
     if (ccpaPreferenceAcceptBtn) {
