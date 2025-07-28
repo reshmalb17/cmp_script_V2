@@ -701,6 +701,21 @@ async  function hideAllBanners(){
     console.log('Script functionality test completed');
   }
 
+  // Debug function to check what elements are present
+  function debugPageElements() {
+    console.log('=== DEBUGGING PAGE ELEMENTS ===');
+    console.log('preferences-btn:', document.getElementById('preferences-btn'));
+    console.log('accept-btn:', document.getElementById('accept-btn'));
+    console.log('decline-btn:', document.getElementById('decline-btn'));
+    console.log('main-banner:', document.getElementById('main-banner'));
+    console.log('main-consent-banner:', document.getElementById('main-consent-banner'));
+    console.log('consent-banner:', document.getElementById('consent-banner'));
+    console.log('initial-consent-banner:', document.getElementById('initial-consent-banner'));
+    console.log('All buttons with preferences in ID:', document.querySelectorAll('[id*="preferences"]'));
+    console.log('All buttons with preference in class:', document.querySelectorAll('[class*="preference"]'));
+    console.log('=== END DEBUGGING ===');
+  }
+
   async function disableScrollOnSite(){
     const scrollControl = document.querySelector('[scroll-control="true"]');
     function toggleScrolling() {
@@ -724,6 +739,7 @@ async  function hideAllBanners(){
   document.addEventListener('DOMContentLoaded', async function() {
     console.log('DOM Content Loaded - Starting consent management');
     testScriptFunctionality();
+    debugPageElements();
     
     await hideAllBanners();
     await checkConsentExpiration();
@@ -899,9 +915,17 @@ async  function hideAllBanners(){
             // Enable ALL scripts with data-category (regardless of category value)
             enableAllScriptsWithDataCategory();
             
-            hideBanner(banners.consent);
-            hideBanner(banners.ccpa);
-            hideBanner(banners.main);
+            // Hide all banners using correct IDs from HTML
+            const consentBanner = document.getElementById('consent-banner');
+            const mainBanner = document.getElementById('main-banner');
+            const initialConsentBanner = document.getElementById('initial-consent-banner');
+            const mainConsentBanner = document.getElementById('main-consent-banner');
+            
+            if (consentBanner) hideBanner(consentBanner);
+            if (mainBanner) hideBanner(mainBanner);
+            if (initialConsentBanner) hideBanner(initialConsentBanner);
+            if (mainConsentBanner) hideBanner(mainConsentBanner);
+            
             localStorage.setItem("consent-given", "true");
             await saveConsentStateToServer(preferences, cookieDays, true); // Pass true to include userAgent
             updatePreferenceForm(preferences);
@@ -940,9 +964,18 @@ async  function hideAllBanners(){
             // Set consent state and block ALL scripts (including Google scripts)
             setConsentState(preferences, cookieDays);
             blockScriptsByCategory();
-            hideBanner(banners.consent);
-            hideBanner(banners.ccpa);
-            hideBanner(banners.main);
+            
+            // Hide all banners using correct IDs from HTML
+            const consentBanner = document.getElementById('consent-banner');
+            const mainBanner = document.getElementById('main-banner');
+            const initialConsentBanner = document.getElementById('initial-consent-banner');
+            const mainConsentBanner = document.getElementById('main-consent-banner');
+            
+            if (consentBanner) hideBanner(consentBanner);
+            if (mainBanner) hideBanner(mainBanner);
+            if (initialConsentBanner) hideBanner(initialConsentBanner);
+            if (mainConsentBanner) hideBanner(mainConsentBanner);
+            
             localStorage.setItem("consent-given", "true");
             await saveConsentStateToServer(preferences, cookieDays, false);
             updatePreferenceForm(preferences);
@@ -1147,8 +1180,23 @@ async  function hideAllBanners(){
           e.preventDefault();
           console.log('Preferences button clicked');
           try {
-            hideBanner(banners.consent);
-            showBanner(banners.main);
+            // Hide consent banner (GDPR banner)
+            const consentBanner = document.getElementById('consent-banner');
+            if (consentBanner) {
+              hideBanner(consentBanner);
+              console.log('Consent banner hidden');
+            }
+            
+            // Show main banner (preferences panel) - this is the correct ID from your HTML
+            const mainBanner = document.getElementById('main-banner');
+            if (mainBanner) {
+              showBanner(mainBanner);
+              console.log('Main banner (preferences panel) shown successfully');
+            } else {
+              console.error('Main banner not found - ID: main-banner');
+            }
+            
+            // Update preference form with saved preferences
             updatePreferenceForm(getConsentPreferences());
             console.log('Preferences button action completed');
           } catch (error) {
@@ -1156,7 +1204,30 @@ async  function hideAllBanners(){
           }
         };
       } else {
-        console.warn('Preferences button not found');
+        console.warn('Preferences button not found - checked for id: preferences-btn');
+        // Try alternative selectors
+        const altPreferencesBtn = document.querySelector('.consentbit-banner-button-preference') || 
+                                 document.querySelector('[class*="preference"]');
+        if (altPreferencesBtn) {
+          console.log('Found preferences button with alternative selector');
+          altPreferencesBtn.onclick = function(e) {
+            e.preventDefault();
+            console.log('Preferences button clicked (alternative)');
+            try {
+              const consentBanner = document.getElementById('consent-banner');
+              if (consentBanner) {
+                hideBanner(consentBanner);
+              }
+              const mainBanner = document.getElementById('main-banner');
+              if (mainBanner) {
+                showBanner(mainBanner);
+              }
+              updatePreferenceForm(getConsentPreferences());
+            } catch (error) {
+              console.error('Error in alternative Preferences button handler:', error);
+            }
+          };
+        }
       }
       
       // Save Preferences button
