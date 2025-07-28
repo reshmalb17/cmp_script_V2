@@ -905,10 +905,10 @@ async  function hideAllBanners(){
           hideBanner(initialBanner);
         }
         
-        // Show main consent banner with force
-        const mainBanner = document.getElementById('main-consent-banner');
-        if (mainBanner) {
-          showBanner(mainBanner);
+        // Show CCPA preference panel instead of main consent banner
+        const ccpaPreferencePanel = document.querySelector('.consentbit-ccpa_preference');
+        if (ccpaPreferencePanel) {
+          showBanner(ccpaPreferencePanel);
           
           // Update CCPA preference form with saved preferences
           updateCCPAPreferenceForm(getConsentPreferences());
