@@ -517,23 +517,37 @@ async  function hideAllBanners(){
 
   // --- Advanced: Show saved preferences in preferences panel ---
   function updatePreferenceForm(preferences) {
+    console.log('Updating preference form with:', preferences);
+    
     const necessaryCheckbox = document.querySelector('[data-consent-id="necessary-checkbox"]');
     const marketingCheckbox = document.querySelector('[data-consent-id="marketing-checkbox"]');
     const personalizationCheckbox = document.querySelector('[data-consent-id="personalization-checkbox"]');
     const analyticsCheckbox = document.querySelector('[data-consent-id="analytics-checkbox"]');
+    
     if (necessaryCheckbox) {
       necessaryCheckbox.checked = true;
       necessaryCheckbox.disabled = true;
+      console.log('Necessary checkbox set to checked and disabled');
     }
+    
     if (marketingCheckbox) {
       marketingCheckbox.checked = Boolean(preferences.Marketing);
+      console.log('Marketing checkbox set to:', Boolean(preferences.Marketing));
     }
+    
     if (personalizationCheckbox) {
       personalizationCheckbox.checked = Boolean(preferences.Personalization);
+      console.log('Personalization checkbox set to:', Boolean(preferences.Personalization));
     }
+    
     if (analyticsCheckbox) {
       analyticsCheckbox.checked = Boolean(preferences.Analytics);
+      console.log('Analytics checkbox set to:', Boolean(preferences.Analytics));
     }
+    
+    // Also update localStorage to ensure consistency
+    localStorage.setItem('consent-preferences', JSON.stringify(preferences));
+    console.log('Preferences saved to localStorage');
   }
 
   // --- CCPA: Update CCPA preference form checkboxes ---
@@ -716,6 +730,32 @@ async  function hideAllBanners(){
     console.log('=== END DEBUGGING ===');
   }
 
+  // Function to load and display saved preferences
+  function loadAndDisplaySavedPreferences() {
+    console.log('Loading saved preferences...');
+    
+    // Get saved preferences from localStorage
+    const savedPreferences = localStorage.getItem('consent-preferences');
+    if (savedPreferences) {
+      try {
+        const preferences = JSON.parse(savedPreferences);
+        console.log('Found saved preferences:', preferences);
+        
+        // Update the preference form with saved preferences
+        updatePreferenceForm(preferences);
+        
+        // Also update the CCPA preference form if it exists
+        updateCCPAPreferenceForm(preferences);
+        
+        console.log('Saved preferences loaded and displayed');
+      } catch (error) {
+        console.error('Error parsing saved preferences:', error);
+      }
+    } else {
+      console.log('No saved preferences found in localStorage');
+    }
+  }
+
   async function disableScrollOnSite(){
     const scrollControl = document.querySelector('[scroll-control="true"]');
     function toggleScrolling() {
@@ -740,6 +780,7 @@ async  function hideAllBanners(){
     console.log('DOM Content Loaded - Starting consent management');
     testScriptFunctionality();
     debugPageElements();
+    loadAndDisplaySavedPreferences(); // Load saved preferences
     
     await hideAllBanners();
     await checkConsentExpiration();
@@ -849,25 +890,7 @@ async  function hideAllBanners(){
     const prefs = getConsentPreferences();
     updatePreferenceForm(prefs);
 
-    // If consent is already given, hide all banners and do not show any
-    if (consentGiven === "true") {
-      await hideAllBanners();
-      // Do not show any banner unless user clicks the icon
-      return;
-    }
-
-    // In staging mode, if location detection fails, create a default location for testing
-    if (isStaging && !locationData) {
-      console.log('Staging mode: Location detection failed, using default GDPR banner for testing');
-      locationData = {
-        country: 'US',
-        continent: 'NA',
-        state: null,
-        bannerType: 'GDPR'
-      };
-    }
-
-    // Set up button handlers ALWAYS (not conditional)
+    // Set up button handlers ALWAYS (before consent check)
     function qid(id) { return document.getElementById(id); }
     function qs(sel) { return document.querySelector(sel); }
     
@@ -1050,12 +1073,19 @@ async  function hideAllBanners(){
       console.warn('Do Not Share button not found - checked for id: do-not-share-link');
     }
 
+    // If consent is already given, hide all banners and do not show any
+    if (consentGiven === "true") {
+      await hideAllBanners();
+      // Do not show any banner unless user clicks the icon
+      return;
+    }
+    
     // CCPA Preference Accept button
     const ccpaPreferenceAcceptBtn = document.getElementById('consebit-ccpa-prefrence-accept');
     if (ccpaPreferenceAcceptBtn) {
       console.log('Setting up CCPA Preference Accept button handler');
-      ccpaPreferenceAcceptBtn.onclick = async function(e) {
-        e.preventDefault();
+ccpaPreferenceAcceptBtn.onclick = async function(e) {
+  e.preventDefault();
         console.log('CCPA Preference Accept button clicked');
         try {
           // Read CCPA preference checkbox values
@@ -1217,12 +1247,12 @@ async  function hideAllBanners(){
           
           // STEP 4: Save consent state with all preferences as false (like decline behavior)
           const preferences = { 
-            Analytics: false, 
-            Marketing: false, 
-            Personalization: false, 
-            bannerType: locationData ? locationData.bannerType : undefined 
-          };
-          
+      Analytics: false, 
+      Marketing: false, 
+      Personalization: false,
+      bannerType: locationData ? locationData.bannerType : undefined 
+    };
+    
           setConsentState(preferences, cookieDays);
           updateGtagConsent(preferences);
           
@@ -1246,407 +1276,11 @@ async  function hideAllBanners(){
           console.error('Error in Cancel button handler:', error);
         }
       };
-    } else {
+  } else {
       console.warn('Cancel button not found');
     }
 
-    // Only show banners and run consent logic if canPublish or isStaging
-    if (canPublish || isStaging) {
-      const banners = {
-        consent: qid("consent-banner"),
-        ccpa: qid("initial-consent-banner"),
-        main: qid("main-banner")
-      };
-      
-      // Show banners if consent not given AND (location data is available OR in staging mode)
-      if (!consentGiven && (locationData || isStaging)) {
-        if (["CCPA", "VCDPA", "CPA", "CTDPA", "UCPA"].includes(locationData.bannerType)) {
-          // US Privacy Laws: Unblock all scripts initially (opt-out model)
-          unblockScriptsWithDataCategory();
-          showBanner(banners.ccpa);
-          hideBanner(banners.consent);
-          
-          // Force display US privacy banner
-          if (banners.ccpa) {
-            banners.ccpa.style.display = "block";
-            banners.ccpa.style.visibility = "visible";
-            banners.ccpa.hidden = false;
-            banners.ccpa.classList.remove("hidden");
-            banners.ccpa.classList.add("show-banner");
-          }
-        } else {
-          // Show GDPR banner (default for EU and other locations)
-          showBanner(banners.consent);
-          hideBanner(banners.ccpa);
-          blockScriptsByCategory();
-        }
-      }
-      
-      // Do Not Share (CCPA)
-      const doNotShareBtn = qid('do-not-share-link');
-      if (doNotShareBtn) {
-        doNotShareBtn.onclick = function(e) {
-          e.preventDefault();
-          
-          // Hide initial CCPA banner with FORCE
-          const initialBanner = document.getElementById('initial-consent-banner');
-          if (initialBanner) {
-            hideBanner(initialBanner);
-          }
-          
-          // Show main consent banner with force
-          const mainBanner = document.getElementById('main-consent-banner');
-          if (mainBanner) {
-            showBanner(mainBanner);
-            
-            // Update CCPA preference form with saved preferences
-            updateCCPAPreferenceForm(getConsentPreferences());
-          }
-        };
-      }
-    
-      // CCPA Preference Accept button
-      const ccpaPreferenceAcceptBtn = document.getElementById('consebit-ccpa-prefrence-accept');
-      if (ccpaPreferenceAcceptBtn) {
-        ccpaPreferenceAcceptBtn.onclick = async function(e) {
-          e.preventDefault();
-          
-          // Read CCPA preference checkbox values
-          const ccpaToggleCheckboxes = document.querySelectorAll('.consentbit-ccpa-prefrence-toggle input[type="checkbox"]');
-          let preferences = { Analytics: true, Marketing: true, Personalization: true, donotshare: false }; // Default to true (unblocked)
-          
-          // If checkboxes are checked, it means "Do Not Share" for that category (block scripts)
-          ccpaToggleCheckboxes.forEach(checkbox => {
-            if (checkbox.checked) {
-              // Checkbox checked means DO NOT SHARE (block/false)
-              const checkboxName = checkbox.name || checkbox.getAttribute('data-category') || '';
-              if (checkboxName.toLowerCase().includes('analytics')) {
-                preferences.Analytics = false;
-              } else if (checkboxName.toLowerCase().includes('marketing') || checkboxName.toLowerCase().includes('advertising')) {
-                preferences.Marketing = false;
-              } else if (checkboxName.toLowerCase().includes('personalization') || checkboxName.toLowerCase().includes('functional')) {
-                preferences.Personalization = false;
-              }
-            }
-          });
-          
-          // Add banner type
-          preferences.bannerType = locationData ? locationData.bannerType : undefined;
-          preferences.donotshare = false; // CCPA Accept means do not share = false
-          
-          // Save consent state
-          setConsentState(preferences, cookieDays);
-          
-          // Block/enable scripts based on preferences (including Google scripts)
-          if (preferences.Analytics && preferences.Marketing && preferences.Personalization) {
-            // All categories allowed - enable ALL scripts with data-category
-            enableAllScriptsWithDataCategory();
-          } else if (preferences.Analytics || preferences.Marketing || preferences.Personalization) {
-            // Some categories allowed - enable only selected categories
-            enableScriptsByCategories(Object.keys(preferences).filter(k => preferences[k]));
-          } else {
-            // No categories allowed - block all scripts
-            blockScriptsByCategory();
-          }
-          
-          // Hide both CCPA banners using hideBanner function
-          hideBanner(banners.ccpa);
-          const ccpaPreferencePanel = document.querySelector('.consentbit-ccpa_preference');
-          hideBanner(ccpaPreferencePanel);
-          const ccpaBannerDiv = document.querySelector('.consentbit-ccpa-banner-div');
-          hideBanner(ccpaBannerDiv);
-          
-          // Set consent as given
-          localStorage.setItem("consent-given", "true");
-          
-          // Save to server (original CCPA logic - always include userAgent)
-          await saveConsentStateToServer(preferences, cookieDays, true);
-          updatePreferenceForm(preferences);
-        };
-      }
-      // CCPA Preference Decline button
-      const ccpaPreferenceDeclineBtn = document.getElementById('consebit-ccpa-prefrence-decline');
-      if (ccpaPreferenceDeclineBtn) {
-        ccpaPreferenceDeclineBtn.onclick = async function(e) {
-          e.preventDefault();
-          
-          // Decline means block all scripts (all false)
-          const preferences = { 
-            Analytics: false, 
-            Marketing: false, 
-            Personalization: false, 
-            donotshare: true, // CCPA Decline means do not share = true
-            bannerType: locationData ? locationData.bannerType : undefined 
-          };
-          
-          // Save consent state
-          setConsentState(preferences, cookieDays);
-          
-          // Block all scripts (including Google scripts)
-          blockScriptsByCategory();
-          
-          // Hide both CCPA banners using hideBanner function
-          hideBanner(document.getElementById("initial-consent-banner"));
-          const ccpaPreferencePanel = document.querySelector('.consentbit-ccpa_preference');
-          hideBanner(ccpaPreferencePanel);
-          const ccpaBannerDiv = document.querySelector('.consentbit-ccpa-banner-div');
-          hideBanner(ccpaBannerDiv);
-          
-          // Set consent as given
-          localStorage.setItem("consent-given", "true");
-          
-          // Save to server (original CCPA logic - always include userAgent)
-          await saveConsentStateToServer(preferences, cookieDays, true);
-          updatePreferenceForm(preferences);
-        };
-      }
-      
-      // Save button (CCPA)
-      const saveBtn = document.getElementById('save-btn');
-      if (saveBtn) {
-        saveBtn.onclick = async function(e) {
-          e.preventDefault();
-          
-          // Read the do-not-share checkbox value
-          const doNotShareCheckbox = document.querySelector('[data-consent-id="do-not-share-checkbox"]');
-          let preferences;
-          let includeUserAgent;
-          
-          if (doNotShareCheckbox && doNotShareCheckbox.checked) {
-            // Checkbox checked means "Do Not Share" - block all scripts and restrict userAgent
-            preferences = { 
-              Analytics: false, 
-              Marketing: false, 
-              Personalization: false,
-              donotshare: true,
-              bannerType: locationData ? locationData.bannerType : undefined 
-            };
-            includeUserAgent = false; // Restrict userAgent
-          } else {
-            // Checkbox unchecked means "Allow" - unblock all scripts and allow userAgent
-            preferences = { 
-              Analytics: true, 
-              Marketing: true, 
-              Personalization: true,
-              donotshare: false,
-              bannerType: locationData ? locationData.bannerType : undefined 
-            };
-            includeUserAgent = true; // Allow userAgent
-          }
-          
-          // Save consent state
-          setConsentState(preferences, cookieDays);
-          
-          // Handle script blocking/unblocking based on checkbox state (including Google scripts)
-          if (doNotShareCheckbox && doNotShareCheckbox.checked) {
-            // CCPA: Block all scripts with data-category attribute (including Google scripts)
-            blockScriptsWithDataCategory();
-          } else {
-            // CCPA: Unblock all scripts with data-category attribute (including Google scripts)
-            unblockScriptsWithDataCategory();
-          }
-          
-          // Hide both CCPA banners - close everything
-          const mainConsentBanner = document.getElementById('main-consent-banner');
-          const initialConsentBanner = document.getElementById('initial-consent-banner');
-          
-          if (mainConsentBanner) {
-            hideBanner(mainConsentBanner);
-          }
-          if (initialConsentBanner) {
-            hideBanner(initialConsentBanner);
-          }
-          
-          // Set consent as given
-          localStorage.setItem("consent-given", "true");
-          
-          // Save to server with appropriate userAgent setting based on checkbox
-          await saveConsentStateToServer(preferences, cookieDays, includeUserAgent);
-          updatePreferenceForm(preferences);
-        };
-      }
-      
-      // Preferences button (show preferences panel)
-      const preferencesBtn = qid('preferences-btn');
-      if (preferencesBtn) {
-        console.log('Setting up Preferences button handler');
-        preferencesBtn.onclick = function(e) {
-          e.preventDefault();
-          console.log('Preferences button clicked');
-          try {
-            // Hide consent banner (GDPR banner)
-            const consentBanner = document.getElementById('consent-banner');
-            if (consentBanner) {
-              hideBanner(consentBanner);
-              console.log('Consent banner hidden');
-            }
-            
-            // Show main banner (preferences panel) - this is the correct ID from your HTML
-            const mainBanner = document.getElementById('main-banner');
-            if (mainBanner) {
-              showBanner(mainBanner);
-              console.log('Main banner (preferences panel) shown successfully');
-            } else {
-              console.error('Main banner not found - ID: main-banner');
-            }
-            
-            // Update preference form with saved preferences
-            updatePreferenceForm(getConsentPreferences());
-            console.log('Preferences button action completed');
-          } catch (error) {
-            console.error('Error in Preferences button handler:', error);
-          }
-        };
-      } else {
-        console.warn('Preferences button not found - checked for id: preferences-btn');
-        // Try alternative selectors
-        const altPreferencesBtn = document.querySelector('.consentbit-banner-button-preference') || 
-                                 document.querySelector('[class*="preference"]');
-        if (altPreferencesBtn) {
-          console.log('Found preferences button with alternative selector');
-          altPreferencesBtn.onclick = function(e) {
-            e.preventDefault();
-            console.log('Preferences button clicked (alternative)');
-            try {
-              const consentBanner = document.getElementById('consent-banner');
-              if (consentBanner) {
-                hideBanner(consentBanner);
-              }
-              const mainBanner = document.getElementById('main-banner');
-              if (mainBanner) {
-                showBanner(mainBanner);
-              }
-              updatePreferenceForm(getConsentPreferences());
-            } catch (error) {
-              console.error('Error in alternative Preferences button handler:', error);
-            }
-          };
-        }
-      }
-      
-      // Save Preferences button
-      const savePreferencesBtn = qid('save-preferences-btn');
-      if (savePreferencesBtn) {
-        console.log('Setting up Save Preferences button handler');
-        savePreferencesBtn.onclick = async function(e) {
-          e.preventDefault();
-          console.log('Save Preferences button clicked');
-          try {
-            // Read checkboxes
-            const analytics = !!qs('[data-consent-id="analytics-checkbox"]:checked');
-            const marketing = !!qs('[data-consent-id="marketing-checkbox"]:checked');
-            const personalization = !!qs('[data-consent-id="personalization-checkbox"]:checked');
-            const preferences = {
-              Analytics: analytics,
-              Marketing: marketing,
-              Personalization: personalization,
-              bannerType: locationData ? locationData.bannerType : undefined
-            };
-            setConsentState(preferences, cookieDays);
-            // First block ALL scripts except necessary/essential (including Google scripts)
-            blockScriptsByCategory();
-            // Then enable only scripts for selected categories (including Google scripts)
-            const selectedCategories = Object.keys(preferences).filter(k => preferences[k] && k !== 'bannerType');
-            if (selectedCategories.length > 0) {
-              enableScriptsByCategories(selectedCategories);
-            }
-            hideBanner(banners.main);
-            hideBanner(banners.consent);
-            hideBanner(banners.ccpa);
-            localStorage.setItem("consent-given", "true");
-            await saveConsentStateToServer(preferences, cookieDays, true); // Include userAgent for preferences
-            updatePreferenceForm(preferences);
-            console.log('Save Preferences button action completed');
-          } catch (error) {
-            console.error('Error in Save Preferences button handler:', error);
-          }
-        };
-      } else {
-        console.warn('Save Preferences button not found');
-      }
-
-
-      // Cancel button (go back to main banner)
-      const cancelGDPRBtn = qid('cancel-btn');
-      if (cancelGDPRBtn) {
-        console.log('Setting up Cancel button handler');
-        cancelGDPRBtn.onclick = async function(e) {
-          e.preventDefault();
-          console.log('Cancel button clicked');
-          try {
-            // STEP 1: Block all scripts except necessary/essential
-            blockScriptsByCategory();
-            
-            // STEP 2: Also block any scripts that are already running by disabling them
-            // Disable Google Analytics if present
-            if (typeof gtag !== 'undefined') {
-              gtag('consent', 'update', {
-                'analytics_storage': 'denied',
-                'ad_storage': 'denied',
-                'ad_personalization': 'denied',
-                'ad_user_data': 'denied',
-                'personalization_storage': 'denied'
-              });
-            }
-            
-            // Disable Google Tag Manager if present
-            if (typeof window.dataLayer !== 'undefined') {
-              window.dataLayer.push({
-                'event': 'consent_denied',
-                'analytics_storage': 'denied',
-                'ad_storage': 'denied'
-              });
-            }
-            
-            // STEP 3: Uncheck all preference checkboxes
-            const analyticsCheckbox = qs('[data-consent-id="analytics-checkbox"]');
-            const marketingCheckbox = qs('[data-consent-id="marketing-checkbox"]');
-            const personalizationCheckbox = qs('[data-consent-id="personalization-checkbox"]');
-            
-            if (analyticsCheckbox) {
-              analyticsCheckbox.checked = false;
-            }
-            if (marketingCheckbox) {
-              marketingCheckbox.checked = false;
-            }
-            if (personalizationCheckbox) {
-              personalizationCheckbox.checked = false;
-            }
-            
-            // STEP 4: Save consent state with all preferences as false (like decline behavior)
-            const preferences = { 
-              Analytics: false, 
-              Marketing: false, 
-              Personalization: false, 
-              bannerType: locationData ? locationData.bannerType : undefined 
-            };
-            
-            setConsentState(preferences, cookieDays);
-            updateGtagConsent(preferences);
-            
-            // STEP 5: Set consent as given and save to server
-            localStorage.setItem("consent-given", "true");
-            
-            try {
-              await saveConsentStateToServer(preferences, cookieDays, false); // Exclude userAgent like decline
-            } catch (error) {
-              // Silent error handling
-            }
-            
-            // STEP 6: Hide banners
-            hideBanner(banners.main);
-            hideBanner(banners.consent);
-            console.log('Cancel button action completed');
-          } catch (error) {
-            console.error('Error in Cancel button handler:', error);
-          }
-        };
-      } else {
-        console.warn('Cancel button not found');
-      }
-
-
-      // Cancel button (go back to main banner)
+    // Cancel button (go back to main banner)
       const cancelBtn = document.getElementById('close-consent-banner');
       if (cancelBtn) {
         cancelBtn.onclick = async function(e) {
@@ -1666,7 +1300,7 @@ async  function hideAllBanners(){
         };
       }
       // CCPA Link Block - Show CCPA Banner
-      const ccpaLinkBlock = document.getElementById('consentbit-ccpa-linkblock');
+      const ccpaLinkBlock = document.getElementById('do-not-share-link');
       if (ccpaLinkBlock) {
         ccpaLinkBlock.onclick = function(e) {
           e.preventDefault();
@@ -1685,184 +1319,181 @@ async  function hideAllBanners(){
       
       // Load consent styles after banners are shown
       loadConsentStyles();
-    }
-  });
-  
- // End DOMContentLoaded event listener
+    });
 
-    // --- CCPA-specific script handling functions ---
-    function unblockScriptsWithDataCategory() {
-      // CCPA: Unblock ALL scripts with data-category attribute (including Google scripts) only in head section
-      var scripts = document.head.querySelectorAll('script[type="text/plain"][data-category]');
-      scripts.forEach(function(oldScript) {
-        var newScript = document.createElement('script');
-        for (var i = 0; i < oldScript.attributes.length; i++) {
-          var attr = oldScript.attributes[i];
-          if (attr.name === 'type') {
-            newScript.type = 'text/javascript';
-          } else if (attr.name !== 'data-blocked-by-ccpa') {
-            newScript.setAttribute(attr.name, attr.value);
-          }
+  // End DOMContentLoaded event listener
+
+  // --- CCPA-specific script handling functions ---
+  function unblockScriptsWithDataCategory() {
+    // CCPA: Unblock ALL scripts with data-category attribute (including Google scripts) only in head section
+    var scripts = document.head.querySelectorAll('script[type="text/plain"][data-category]');
+    scripts.forEach(function(oldScript) {
+      var newScript = document.createElement('script');
+      for (var i = 0; i < oldScript.attributes.length; i++) {
+        var attr = oldScript.attributes[i];
+        if (attr.name === 'type') {
+          newScript.type = 'text/javascript';
+        } else if (attr.name !== 'data-blocked-by-ccpa') {
+          newScript.setAttribute(attr.name, attr.value);
         }
-        if (oldScript.innerHTML) {
-          newScript.innerHTML = oldScript.innerHTML;
-        }
-        oldScript.parentNode.replaceChild(newScript, oldScript);
-      });
+      }
+      if (oldScript.innerHTML) {
+        newScript.innerHTML = oldScript.innerHTML;
+      }
+      oldScript.parentNode.replaceChild(newScript, oldScript);
+    });
+  }
+ 
+  function blockScriptsWithDataCategory() {
+    // CCPA: Block ALL scripts with data-category attribute (including Google scripts) only in head section
+    var scripts = document.head.querySelectorAll('script[data-category]');
+    scripts.forEach(function(script) {
+      if (script.type !== 'text/plain') {
+        script.type = 'text/plain';
+        script.setAttribute('data-blocked-by-ccpa', 'true');
+      }
+    });
+  }
+
+  async function hashStringSHA256(str) {
+    const encoder = new TextEncoder();
+    const data = encoder.encode(str);
+    const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+    return Array.from(new Uint8Array(hashBuffer)).map(b => b.toString(16).padStart(2, '0')).join('');
+  }
+
+  async function scanAndSendHeadScriptsIfChanged(sessionToken) {
+    const headScripts = document.head.querySelectorAll('script');
+    const scriptData = Array.from(headScripts).map(script => ({
+      src: script.src || null,
+      content: script.src ? null : script.innerHTML,
+      dataCategory: script.getAttribute('data-category') || null
+    }));
+    const scriptDataString = JSON.stringify(scriptData);
+    const scriptDataHash = await hashStringSHA256(scriptDataString);
+
+    const cachedHash = localStorage.getItem('headScriptsHash');
+    if (cachedHash !== scriptDataHash) {
     }
-   
-    function blockScriptsWithDataCategory() {
-      // CCPA: Block ALL scripts with data-category attribute (including Google scripts) only in head section
-      var scripts = document.head.querySelectorAll('script[data-category]');
-      scripts.forEach(function(script) {
+    if (cachedHash === scriptDataHash) {
+      return; // No change, do nothing
+    }
+
+    try {
+      const encryptedScriptData = await encryptWithHardcodedKey(scriptDataString);
+      
+      // Get siteName from hostname
+      const siteName = window.location.hostname.replace(/^www\./, '').split('.')[0];
+      
+      // Build API URL with siteName parameter
+      const apiUrl = `https://cb-server.web-8fb.workers.dev/api/v2/cmp/head-scripts?siteName=${encodeURIComponent(siteName)}`;
+      
+      const response = await fetch(apiUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${sessionToken}`,
+        },
+        body: JSON.stringify({ encryptedData: encryptedScriptData }),
+      });
+      
+      if (response.ok) {
+        localStorage.setItem('headScriptsHash', scriptDataHash);
+      } else {
+        console.error('Failed to send head scripts to API:', response.status);
+      }
+    } catch (e) {
+      console.error('Error sending head scripts to API:', e);
+    }
+  }
+
+  function blockNonGoogleScripts() {
+    // Block all scripts (including Google scripts) only in head section
+    var scripts = document.head.querySelectorAll('script[src]');
+    scripts.forEach(function(script) {
+        if (script.type !== 'text/plain') {
+            script.type = 'text/plain';
+            script.setAttribute('data-blocked-by-consent', 'true');
+        }
+    });
+
+    // Block inline scripts only in head section
+    var inlineScripts = document.head.querySelectorAll('script:not([src])');
+    inlineScripts.forEach(function(script) {
+        if (script.innerHTML && script.type !== 'text/plain') {
+            script.type = 'text/plain';
+            script.setAttribute('data-blocked-by-consent', 'true');
+        }
+    });
+  }
+ 
+  function blockTargetedAdvertisingScripts() {
+    const targetedAdvertisingPatterns = /facebook|meta|fbevents|linkedin|twitter|pinterest|tiktok|snap|reddit|quora|outbrain|taboola|sharethrough|doubleclick|adwords|adsense|adservice|pixel|quantserve|scorecardresearch|moat|integral-marketing|comscore|nielsen|quantcast|adobe/i;
+    
+    const scripts = document.head.querySelectorAll('script[src]');
+    scripts.forEach(script => {
+      if (targetedAdvertisingPatterns.test(script.src)) {
         if (script.type !== 'text/plain') {
           script.type = 'text/plain';
-          script.setAttribute('data-blocked-by-ccpa', 'true');
+          script.setAttribute('data-blocked-by-targeted-advertising', 'true');
         }
-      });
-    }
-  
-async function hashStringSHA256(str) {
-  const encoder = new TextEncoder();
-  const data = encoder.encode(str);
-  const hashBuffer = await crypto.subtle.digest('SHA-256', data);
-  return Array.from(new Uint8Array(hashBuffer)).map(b => b.toString(16).padStart(2, '0')).join('');
-}
-
-async function scanAndSendHeadScriptsIfChanged(sessionToken) {
-  const headScripts = document.head.querySelectorAll('script');
-  const scriptData = Array.from(headScripts).map(script => ({
-    src: script.src || null,
-    content: script.src ? null : script.innerHTML,
-    dataCategory: script.getAttribute('data-category') || null
-  }));
-  const scriptDataString = JSON.stringify(scriptData);
-  const scriptDataHash = await hashStringSHA256(scriptDataString);
-
-  const cachedHash = localStorage.getItem('headScriptsHash');
-if (cachedHash !== scriptDataHash) {
-}
-  if (cachedHash === scriptDataHash) {
-    return; // No change, do nothing
-  }
-
-  try {
-    const encryptedScriptData = await encryptWithHardcodedKey(scriptDataString);
-    
-    // Get siteName from hostname
-    const siteName = window.location.hostname.replace(/^www\./, '').split('.')[0];
-    
-    // Build API URL with siteName parameter
-    const apiUrl = `https://cb-server.web-8fb.workers.dev/api/v2/cmp/head-scripts?siteName=${encodeURIComponent(siteName)}`;
-    
-    const response = await fetch(apiUrl, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${sessionToken}`,
-      },
-      body: JSON.stringify({ encryptedData: encryptedScriptData }),
+      }
     });
-    
-    if (response.ok) {
-      localStorage.setItem('headScriptsHash', scriptDataHash);
-    } else {
-      console.error('Failed to send head scripts to API:', response.status);
-    }
-  } catch (e) {
-    console.error('Error sending head scripts to API:', e);
   }
-}
 
-function blockNonGoogleScripts() {
-  // Block all scripts (including Google scripts) only in head section
-  var scripts = document.head.querySelectorAll('script[src]');
-  scripts.forEach(function(script) {
-      if (script.type !== 'text/plain') {
+  function blockSaleScripts() {
+    const salePatterns = /facebook|meta|fbevents|linkedin|twitter|pinterest|tiktok|snap|reddit|quora|outbrain|taboola|sharethrough|doubleclick|adwords|adsense|adservice|pixel|quantserve|scorecardresearch|moat|integral-marketing|comscore|nielsen|quantcast|adobe|marketo|hubspot|salesforce|pardot|eloqua|act-on|mailchimp|constantcontact|sendgrid|klaviyo|braze|iterable/i;
+    
+    const scripts = document.head.querySelectorAll('script[src]');
+    scripts.forEach(script => {
+      if (salePatterns.test(script.src)) {
+        if (script.type !== 'text/plain') {
           script.type = 'text/plain';
-          script.setAttribute('data-blocked-by-consent', 'true');
+          script.setAttribute('data-blocked-by-sale', 'true');
+        }
       }
-  });
+    });
+  }
 
-  // Block inline scripts only in head section
-  var inlineScripts = document.head.querySelectorAll('script:not([src])');
-  inlineScripts.forEach(function(script) {
-      if (script.innerHTML && script.type !== 'text/plain') {
+  function blockProfilingScripts() {
+    const profilingPatterns = /optimizely|hubspot|marketo|pardot|salesforce|intercom|drift|zendesk|freshchat|tawk|livechat|clarity|hotjar|mouseflow|fullstory|logrocket|mixpanel|segment|amplitude|heap|kissmetrics|matomo|piwik|plausible|woopra|crazyegg|clicktale|chartbeat|parse\.ly/i;
+    
+    const scripts = document.head.querySelectorAll('script[src]');
+    scripts.forEach(script => {
+      if (profilingPatterns.test(script.src)) {
+        if (script.type !== 'text/plain') {
           script.type = 'text/plain';
-          script.setAttribute('data-blocked-by-consent', 'true');
+          script.setAttribute('data-blocked-by-profiling', 'true');
+        }
       }
-  });
-}
- 
+    });
+  }
 
-
-function blockTargetedAdvertisingScripts() {
-  const targetedAdvertisingPatterns = /facebook|meta|fbevents|linkedin|twitter|pinterest|tiktok|snap|reddit|quora|outbrain|taboola|sharethrough|doubleclick|adwords|adsense|adservice|pixel|quantserve|scorecardresearch|moat|integral-marketing|comscore|nielsen|quantcast|adobe/i;
-  
-  const scripts = document.head.querySelectorAll('script[src]');
-  scripts.forEach(script => {
-    if (targetedAdvertisingPatterns.test(script.src)) {
-      if (script.type !== 'text/plain') {
-        script.type = 'text/plain';
-        script.setAttribute('data-blocked-by-targeted-advertising', 'true');
+  function blockCrossContextBehavioralAdvertising() {
+    const crossContextPatterns = /facebook|meta|fbevents|linkedin|twitter|pinterest|tiktok|snap|reddit|quora|outbrain|taboola|sharethrough|doubleclick|adwords|adsense|adservice|pixel|quantserve|scorecardresearch|moat|integral-marketing|comscore|nielsen|quantcast|adobe/i;
+    
+    const scripts = document.head.querySelectorAll('script[src]');
+    scripts.forEach(script => {
+      if (crossContextPatterns.test(script.src)) {
+        if (script.type !== 'text/plain') {
+          script.type = 'text/plain';
+          script.setAttribute('data-blocked-by-cross-context', 'true');
+        }
       }
-    }
-  });
-}
+    });
+  }
 
-function blockSaleScripts() {
-  const salePatterns = /facebook|meta|fbevents|linkedin|twitter|pinterest|tiktok|snap|reddit|quora|outbrain|taboola|sharethrough|doubleclick|adwords|adsense|adservice|pixel|quantserve|scorecardresearch|moat|integral-marketing|comscore|nielsen|quantcast|adobe|marketo|hubspot|salesforce|pardot|eloqua|act-on|mailchimp|constantcontact|sendgrid|klaviyo|braze|iterable/i;
-  
-  const scripts = document.head.querySelectorAll('script[src]');
-  scripts.forEach(script => {
-    if (salePatterns.test(script.src)) {
-      if (script.type !== 'text/plain') {
-        script.type = 'text/plain';
-        script.setAttribute('data-blocked-by-sale', 'true');
+  function blockAutomatedDecisionScripts() {
+    const automatedDecisionPatterns = /optimizely|hubspot|marketo|pardot|salesforce|intercom|drift|zendesk|freshchat|tawk|livechat|clarity|hotjar|mouseflow|fullstory|logrocket|mixpanel|segment|amplitude|heap|kissmetrics|matomo|piwik|plausible|woopra|crazyegg|clicktale|chartbeat|parse\.ly/i;
+    
+    const scripts = document.head.querySelectorAll('script[src]');
+    scripts.forEach(script => {
+      if (automatedDecisionPatterns.test(script.src)) {
+        if (script.type !== 'text/plain') {
+          script.type = 'text/plain';
+          script.setAttribute('data-blocked-by-automated-decision', 'true');
+        }
       }
-    }
-  });
-}
-
-function blockProfilingScripts() {
-  const profilingPatterns = /optimizely|hubspot|marketo|pardot|salesforce|intercom|drift|zendesk|freshchat|tawk|livechat|clarity|hotjar|mouseflow|fullstory|logrocket|mixpanel|segment|amplitude|heap|kissmetrics|matomo|piwik|plausible|woopra|crazyegg|clicktale|chartbeat|parse\.ly/i;
-  
-  const scripts = document.head.querySelectorAll('script[src]');
-  scripts.forEach(script => {
-    if (profilingPatterns.test(script.src)) {
-      if (script.type !== 'text/plain') {
-        script.type = 'text/plain';
-        script.setAttribute('data-blocked-by-profiling', 'true');
-      }
-    }
-  });
-}
-
-function blockCrossContextBehavioralAdvertising() {
-  const crossContextPatterns = /facebook|meta|fbevents|linkedin|twitter|pinterest|tiktok|snap|reddit|quora|outbrain|taboola|sharethrough|doubleclick|adwords|adsense|adservice|pixel|quantserve|scorecardresearch|moat|integral-marketing|comscore|nielsen|quantcast|adobe/i;
-  
-  const scripts = document.head.querySelectorAll('script[src]');
-  scripts.forEach(script => {
-    if (crossContextPatterns.test(script.src)) {
-      if (script.type !== 'text/plain') {
-        script.type = 'text/plain';
-        script.setAttribute('data-blocked-by-cross-context', 'true');
-      }
-    }
-  });
-}
-
-function blockAutomatedDecisionScripts() {
-  const automatedDecisionPatterns = /optimizely|hubspot|marketo|pardot|salesforce|intercom|drift|zendesk|freshchat|tawk|livechat|clarity|hotjar|mouseflow|fullstory|logrocket|mixpanel|segment|amplitude|heap|kissmetrics|matomo|piwik|plausible|woopra|crazyegg|clicktale|chartbeat|parse\.ly/i;
-  
-  const scripts = document.head.querySelectorAll('script[src]');
-  scripts.forEach(script => {
-    if (automatedDecisionPatterns.test(script.src)) {
-      if (script.type !== 'text/plain') {
-        script.type = 'text/plain';
-        script.setAttribute('data-blocked-by-automated-decision', 'true');
-      }
-    }
-  });
-}
-})(); 
+    });
+  }
+})();
