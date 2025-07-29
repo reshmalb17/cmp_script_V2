@@ -792,29 +792,8 @@ async  function hideAllBanners(){
     const prefs = getConsentPreferences();
     updatePreferenceForm(prefs);
 
-    // If consent is already given, hide all banners and do not show any
-    if (consentGiven === "true") {
-      await hideAllBanners();
-      // Do not show any banner unless user clicks the icon
-      return;
-    }
-
-    // Only show banners if consent not given AND location data is available
-    if (!consentGiven && locationData) {
-      if (["CCPA", "VCDPA", "CPA", "CTDPA", "UCPA"].includes(locationData.bannerType)) {
-        // US Privacy Laws: Unblock all scripts initially (opt-out model)
-        unblockScriptsWithDataCategory();
-        showBanner(document.getElementById("initial-consent-banner"));
-        hideBanner(document.getElementById("consent-banner"));
-        
-      
-      } else {
-        // Show GDPR banner (default for EU and other locations)
-        showBanner(document.getElementById("consent-banner"));
-        hideBanner(document.getElementById("initial-consent-banner"));
-        blockScriptsByCategory();
-      }
-    }
+    // Set up ALL button handlers BEFORE checking consent state
+    // This ensures buttons work even after consent is given and page reloads
     
     // Accept all
     const acceptBtn = document.getElementById('accept-btn');
@@ -835,6 +814,7 @@ async  function hideAllBanners(){
         updatePreferenceForm(preferences);
       };
     }
+    
     // Reject all
     const declineBtn = document.getElementById('decline-btn');
     if (declineBtn) {
@@ -866,6 +846,7 @@ async  function hideAllBanners(){
         updatePreferenceForm(preferences);
       };
     }
+    
     // Do Not Share (CCPA)
     const doNotShareBtn = document.getElementById('do-not-share-link');
     if (doNotShareBtn) {
@@ -891,321 +872,347 @@ async  function hideAllBanners(){
     
     // CCPA Preference Accept button
     const ccpaPreferenceAcceptBtn = document.getElementById('consebit-ccpa-prefrence-accept');
-  
     if (ccpaPreferenceAcceptBtn) {
-ccpaPreferenceAcceptBtn.onclick = async function(e) {
-  e.preventDefault();
-  
-  // Read the do-not-share checkbox value
-  const doNotShareCheckbox = document.querySelector('[data-consent-id="do-not-share-checkbox"]');
-  let preferences;
-  
-  if (doNotShareCheckbox && doNotShareCheckbox.checked) {
-    // Checkbox checked means "Do Not Share" - block based on US law type
-    preferences = { 
-      Analytics: false, 
-      Marketing: false, 
-      Personalization: false,
-      donotshare: true,
-      bannerType: locationData ? locationData.bannerType : undefined 
-    };
-    
-    // Apply law-specific blocking based on banner type
-    if (locationData && ["VCDPA", "CPA", "CTDPA", "UCPA"].includes(locationData.bannerType)) {
-      // Enhanced privacy laws with granular opt-out requirements
-      console.log(`[CONSENT-FLOW] Applying granular blocking for ${locationData.bannerType}`);
-      blockTargetedAdvertisingScripts();
-      blockSaleScripts();
-      blockProfilingScripts();
-      blockCrossContextBehavioralAdvertising();
-      blockAutomatedDecisionScripts();
-    } else {
-      // CCPA - block all scripts  
-      console.log('[CONSENT-FLOW] Applying CCPA script blocking');
-      blockScriptsWithDataCategory();
-      blockNonGoogleScripts();
-    }
-  } else {
-    // Checkbox unchecked means "Allow" - unblock all scripts
-    preferences = { 
-      Analytics: true, 
-      Marketing: true, 
-      Personalization: true,
-      donotshare: false,
-      bannerType: locationData ? locationData.bannerType : undefined 
-    };
-    // Unblock all scripts
-    unblockScriptsWithDataCategory();
-  }
-  
-  // Save consent state
-  setConsentState(preferences, cookieDays);
-  
-  // Hide banners
-  hideBanner(document.getElementById("initial-consent-banner"));
-  const ccpaPreferencePanel = document.querySelector('.consentbit-ccpa_preference');
-  hideBanner(ccpaPreferencePanel);
-  const ccpaBannerDiv = document.querySelector('.consentbit-ccpa-banner-div');
-  hideBanner(ccpaBannerDiv);
-  
-  // Set consent as given
-  localStorage.setItem("consent-given", "true");
-  
-  // Save to server
-  await saveConsentStateToServer(preferences, cookieDays, true);
-  updatePreferenceForm(preferences);
-};
-    }
-      // CCPA Preference Decline button
-      const ccpaPreferenceDeclineBtn = document.getElementById('consebit-ccpa-prefrence-decline');
-      if (ccpaPreferenceDeclineBtn) {
-        ccpaPreferenceDeclineBtn.onclick = async function(e) {
-          e.preventDefault();
-          
-          // Decline means block all scripts (all false)
-          const preferences = { 
+      ccpaPreferenceAcceptBtn.onclick = async function(e) {
+        e.preventDefault();
+        
+        // Read the do-not-share checkbox value
+        const doNotShareCheckbox = document.querySelector('[data-consent-id="do-not-share-checkbox"]');
+        let preferences;
+        
+        if (doNotShareCheckbox && doNotShareCheckbox.checked) {
+          // Checkbox checked means "Do Not Share" - block based on US law type
+          preferences = { 
             Analytics: false, 
             Marketing: false, 
-            Personalization: false, 
-            donotshare: true, // CCPA Decline means do not share = true
+            Personalization: false,
+            donotshare: true,
             bannerType: locationData ? locationData.bannerType : undefined 
           };
           
-          // Save consent state
-          setConsentState(preferences, cookieDays);
-          
-          // Block all scripts (including Google scripts)
-          blockScriptsByCategory();
-          
-          // Hide both CCPA banners using hideBanner function
-          hideBanner(document.getElementById("initial-consent-banner"));
-          const ccpaPreferencePanel = document.querySelector('.consentbit-ccpa_preference');
-          hideBanner(ccpaPreferencePanel);
-          const ccpaBannerDiv = document.querySelector('.consentbit-ccpa-banner-div');
-          hideBanner(ccpaBannerDiv);
-          
-          // Set consent as given
-          localStorage.setItem("consent-given", "true");
-          
-          // Save to server (original CCPA logic - always include userAgent)
-          await saveConsentStateToServer(preferences, cookieDays, true);
-          updatePreferenceForm(preferences);
-        };
-      }
-      
-      // Save button (CCPA)
-      const saveBtn = document.getElementById('save-btn');
-      if (saveBtn) {
-        saveBtn.onclick = async function(e) {
-          e.preventDefault();
-          
-          // Read the do-not-share checkbox value
-          const doNotShareCheckbox = document.querySelector('[data-consent-id="do-not-share-checkbox"]');
-          let preferences;
-          let includeUserAgent;
-          
-          if (doNotShareCheckbox && doNotShareCheckbox.checked) {
-            // Checkbox checked means "Do Not Share" - block all scripts and restrict userAgent
-            preferences = { 
-              Analytics: false, 
-              Marketing: false, 
-              Personalization: false,
-              donotshare: true,
-              bannerType: locationData ? locationData.bannerType : undefined 
-            };
-            includeUserAgent = false; // Restrict userAgent
+          // Apply law-specific blocking based on banner type
+          if (locationData && ["VCDPA", "CPA", "CTDPA", "UCPA"].includes(locationData.bannerType)) {
+            // Enhanced privacy laws with granular opt-out requirements
+            console.log(`[CONSENT-FLOW] Applying granular blocking for ${locationData.bannerType}`);
+            blockTargetedAdvertisingScripts();
+            blockSaleScripts();
+            blockProfilingScripts();
+            blockCrossContextBehavioralAdvertising();
+            blockAutomatedDecisionScripts();
           } else {
-            // Checkbox unchecked means "Allow" - unblock all scripts and allow userAgent
-            preferences = { 
-              Analytics: true, 
-              Marketing: true, 
-              Personalization: true,
-              donotshare: false,
-              bannerType: locationData ? locationData.bannerType : undefined 
-            };
-            includeUserAgent = true; // Allow userAgent
-          }
-          
-          // Save consent state
-          setConsentState(preferences, cookieDays);
-          
-          // Handle script blocking/unblocking based on checkbox state (including Google scripts)
-          if (doNotShareCheckbox && doNotShareCheckbox.checked) {
-            // CCPA: Block all scripts with data-category attribute (including Google scripts)
+            // CCPA - block all scripts  
+            console.log('[CONSENT-FLOW] Applying CCPA script blocking');
             blockScriptsWithDataCategory();
-          } else {
-            // CCPA: Unblock all scripts with data-category attribute (including Google scripts)
-            unblockScriptsWithDataCategory();
+            blockNonGoogleScripts();
           }
-          
-          // Hide both CCPA banners - close everything
-          const mainConsentBanner = document.getElementById('main-consent-banner');
-          const initialConsentBanner = document.getElementById('initial-consent-banner');
-          
-          if (mainConsentBanner) {
-            hideBanner(mainConsentBanner);
-          }
-          if (initialConsentBanner) {
-            hideBanner(initialConsentBanner);
-          }
-          
-          // Set consent as given
-          localStorage.setItem("consent-given", "true");
-          
-          // Save to server with appropriate userAgent setting based on checkbox
-          await saveConsentStateToServer(preferences, cookieDays, includeUserAgent);
-          updatePreferenceForm(preferences);
-        };
-      }
-      
-      // Preferences button (show preferences panel)
-      const preferencesBtn = document.getElementById('preferences-btn');
-      if (preferencesBtn) {
-        preferencesBtn.onclick = function(e) {
-          e.preventDefault();
-          hideBanner(document.getElementById("consent-banner"));
-          showBanner(document.getElementById("main-banner"));
-          updatePreferenceForm(getConsentPreferences());
-        };
-      }
-      // Save Preferences button
-      const savePreferencesBtn = document.getElementById('save-preferences-btn');
-      if (savePreferencesBtn) {
-        savePreferencesBtn.onclick = async function(e) {
-          e.preventDefault();
-          // Read checkboxes
-          const analytics = !!document.querySelector('[data-consent-id="analytics-checkbox"]:checked');
-          const marketing = !!document.querySelector('[data-consent-id="marketing-checkbox"]:checked');
-          const personalization = !!document.querySelector('[data-consent-id="personalization-checkbox"]:checked');
-          const preferences = {
-            Analytics: analytics,
-            Marketing: marketing,
-            Personalization: personalization,
-            bannerType: locationData ? locationData.bannerType : undefined
+        } else {
+          // Checkbox unchecked means "Allow" - unblock all scripts
+          preferences = { 
+            Analytics: true, 
+            Marketing: true, 
+            Personalization: true,
+            donotshare: false,
+            bannerType: locationData ? locationData.bannerType : undefined 
           };
-          setConsentState(preferences, cookieDays);
-          // First block ALL scripts except necessary/essential (including Google scripts)
-          blockScriptsByCategory();
-          // Then enable only scripts for selected categories (including Google scripts)
-          const selectedCategories = Object.keys(preferences).filter(k => preferences[k] && k !== 'bannerType');
-          if (selectedCategories.length > 0) {
-            enableScriptsByCategories(selectedCategories);
-          }
-          hideBanner(document.getElementById("main-banner"));
-          hideBanner(document.getElementById("consent-banner"));
-          hideBanner(document.getElementById("initial-consent-banner"));
-          localStorage.setItem("consent-given", "true");
-          await saveConsentStateToServer(preferences, cookieDays, true); // Include userAgent for preferences
-          updatePreferenceForm(preferences);
+          // Unblock all scripts
+          unblockScriptsWithDataCategory();
+        }
+        
+        // Save consent state
+        setConsentState(preferences, cookieDays);
+        
+        // Hide banners
+        hideBanner(document.getElementById("initial-consent-banner"));
+        const ccpaPreferencePanel = document.querySelector('.consentbit-ccpa_preference');
+        hideBanner(ccpaPreferencePanel);
+        const ccpaBannerDiv = document.querySelector('.consentbit-ccpa-banner-div');
+        hideBanner(ccpaBannerDiv);
+        
+        // Set consent as given
+        localStorage.setItem("consent-given", "true");
+        
+        // Save to server
+        await saveConsentStateToServer(preferences, cookieDays, true);
+        updatePreferenceForm(preferences);
+      };
+    }
+    
+    // CCPA Preference Decline button
+    const ccpaPreferenceDeclineBtn = document.getElementById('consebit-ccpa-prefrence-decline');
+    if (ccpaPreferenceDeclineBtn) {
+      ccpaPreferenceDeclineBtn.onclick = async function(e) {
+        e.preventDefault();
+        
+        // Decline means block all scripts (all false)
+        const preferences = { 
+          Analytics: false, 
+          Marketing: false, 
+          Personalization: false, 
+          donotshare: true, // CCPA Decline means do not share = true
+          bannerType: locationData ? locationData.bannerType : undefined 
         };
-      }
-
-
-   // Cancel button (go back to main banner)
-   const cancelGDPRBtn = document.getElementById('cancel-btn');
-   if (cancelGDPRBtn) {
-    cancelGDPRBtn.onclick = async function(e) {
-       e.preventDefault();
-       
-       // STEP 1: Block all scripts except necessary/essential
-       blockScriptsByCategory();
-       
-       // STEP 2: Also block any scripts that are already running by disabling them
-       // Disable Google Analytics if present
-       if (typeof gtag !== 'undefined') {
-         gtag('consent', 'update', {
-           'analytics_storage': 'denied',
-           'ad_storage': 'denied',
-           'ad_personalization': 'denied',
-           'ad_user_data': 'denied',
-           'personalization_storage': 'denied'
-         });
-       }
-       
-       // Disable Google Tag Manager if present
-       if (typeof window.dataLayer !== 'undefined') {
-         window.dataLayer.push({
-           'event': 'consent_denied',
-           'analytics_storage': 'denied',
-           'ad_storage': 'denied'
-         });
-       }
-       
-       // STEP 3: Uncheck all preference checkboxes
-       const analyticsCheckbox = document.querySelector('[data-consent-id="analytics-checkbox"]');
-       const marketingCheckbox = document.querySelector('[data-consent-id="marketing-checkbox"]');
-       const personalizationCheckbox = document.querySelector('[data-consent-id="personalization-checkbox"]');
-       
-       if (analyticsCheckbox) {
-         analyticsCheckbox.checked = false;
-       }
-       if (marketingCheckbox) {
-         marketingCheckbox.checked = false;
-       }
-       if (personalizationCheckbox) {
-         personalizationCheckbox.checked = false;
-       }
-       
-       // STEP 4: Save consent state with all preferences as false (like decline behavior)
-       const preferences = { 
-         Analytics: false, 
-         Marketing: false, 
-         Personalization: false, 
-         bannerType: locationData ? locationData.bannerType : undefined 
-       };
-       
-       setConsentState(preferences, cookieDays);
-       updateGtagConsent(preferences);
-       
-       // STEP 5: Set consent as given and save to server
-       localStorage.setItem("consent-given", "true");
-       
-       try {
-         await saveConsentStateToServer(preferences, cookieDays, false); // Exclude userAgent like decline
-       } catch (error) {
-         // Silent error handling
-       }
-       
-       // STEP 6: Hide banners
-       hideBanner(document.getElementById("main-banner"));
-       hideBanner(document.getElementById("consent-banner"));
-     };
+        
+        // Save consent state
+        setConsentState(preferences, cookieDays);
+        
+        // Block all scripts (including Google scripts)
+        blockScriptsByCategory();
+        
+        // Hide both CCPA banners using hideBanner function
+        hideBanner(document.getElementById("initial-consent-banner"));
+        const ccpaPreferencePanel = document.querySelector('.consentbit-ccpa_preference');
+        hideBanner(ccpaPreferencePanel);
+        const ccpaBannerDiv = document.querySelector('.consentbit-ccpa-banner-div');
+        hideBanner(ccpaBannerDiv);
+        
+        // Set consent as given
+        localStorage.setItem("consent-given", "true");
+        
+        // Save to server (original CCPA logic - always include userAgent)
+        await saveConsentStateToServer(preferences, cookieDays, true);
+        updatePreferenceForm(preferences);
+      };
+    }
+    
+    // Save button (CCPA)
+    const saveBtn = document.getElementById('save-btn');
+    if (saveBtn) {
+      saveBtn.onclick = async function(e) {
+        e.preventDefault();
+        
+        // Read the do-not-share checkbox value
+        const doNotShareCheckbox = document.querySelector('[data-consent-id="do-not-share-checkbox"]');
+        let preferences;
+        let includeUserAgent;
+        
+        if (doNotShareCheckbox && doNotShareCheckbox.checked) {
+          // Checkbox checked means "Do Not Share" - block all scripts and restrict userAgent
+          preferences = { 
+            Analytics: false, 
+            Marketing: false, 
+            Personalization: false,
+            donotshare: true,
+            bannerType: locationData ? locationData.bannerType : undefined 
+          };
+          includeUserAgent = false; // Restrict userAgent
+        } else {
+          // Checkbox unchecked means "Allow" - unblock all scripts and allow userAgent
+          preferences = { 
+            Analytics: true, 
+            Marketing: true, 
+            Personalization: true,
+            donotshare: false,
+            bannerType: locationData ? locationData.bannerType : undefined 
+          };
+          includeUserAgent = true; // Allow userAgent
+        }
+        
+        // Save consent state
+        setConsentState(preferences, cookieDays);
+        
+        // Handle script blocking/unblocking based on checkbox state (including Google scripts)
+        if (doNotShareCheckbox && doNotShareCheckbox.checked) {
+          // CCPA: Block all scripts with data-category attribute (including Google scripts)
+          blockScriptsWithDataCategory();
+        } else {
+          // CCPA: Unblock all scripts with data-category attribute (including Google scripts)
+          unblockScriptsWithDataCategory();
+        }
+        
+        // Hide both CCPA banners - close everything
+        const mainConsentBanner = document.getElementById('main-consent-banner');
+        const initialConsentBanner = document.getElementById('initial-consent-banner');
+        
+        if (mainConsentBanner) {
+          hideBanner(mainConsentBanner);
+        }
+        if (initialConsentBanner) {
+          hideBanner(initialConsentBanner);
+        }
+        
+        // Set consent as given
+        localStorage.setItem("consent-given", "true");
+        
+        // Save to server with appropriate userAgent setting based on checkbox
+        await saveConsentStateToServer(preferences, cookieDays, includeUserAgent);
+        updatePreferenceForm(preferences);
+      };
+    }
+    
+    // Preferences button (show preferences panel)
+    const preferencesBtn = document.getElementById('preferences-btn');
+    if (preferencesBtn) {
+      preferencesBtn.onclick = function(e) {
+        e.preventDefault();
+        hideBanner(document.getElementById("consent-banner"));
+        showBanner(document.getElementById("main-banner"));
+        updatePreferenceForm(getConsentPreferences());
+      };
+    }
+    
+    // Save Preferences button
+    const savePreferencesBtn = document.getElementById('save-preferences-btn');
+    if (savePreferencesBtn) {
+      savePreferencesBtn.onclick = async function(e) {
+        e.preventDefault();
+        // Read checkboxes
+        const analytics = !!document.querySelector('[data-consent-id="analytics-checkbox"]:checked');
+        const marketing = !!document.querySelector('[data-consent-id="marketing-checkbox"]:checked');
+        const personalization = !!document.querySelector('[data-consent-id="personalization-checkbox"]:checked');
+        const preferences = {
+          Analytics: analytics,
+          Marketing: marketing,
+          Personalization: personalization,
+          bannerType: locationData ? locationData.bannerType : undefined
+        };
+        setConsentState(preferences, cookieDays);
+        // First block ALL scripts except necessary/essential (including Google scripts)
+        blockScriptsByCategory();
+        // Then enable only scripts for selected categories (including Google scripts)
+        const selectedCategories = Object.keys(preferences).filter(k => preferences[k] && k !== 'bannerType');
+        if (selectedCategories.length > 0) {
+          enableScriptsByCategories(selectedCategories);
+        }
+        hideBanner(document.getElementById("main-banner"));
+        hideBanner(document.getElementById("consent-banner"));
+        hideBanner(document.getElementById("initial-consent-banner"));
+        localStorage.setItem("consent-given", "true");
+        await saveConsentStateToServer(preferences, cookieDays, true); // Include userAgent for preferences
+        updatePreferenceForm(preferences);
+      };
     }
 
+    // Cancel button (go back to main banner)
+    const cancelGDPRBtn = document.getElementById('cancel-btn');
+    if (cancelGDPRBtn) {
+      cancelGDPRBtn.onclick = async function(e) {
+        e.preventDefault();
+        
+        // STEP 1: Block all scripts except necessary/essential
+        blockScriptsByCategory();
+        
+        // STEP 2: Also block any scripts that are already running by disabling them
+        // Disable Google Analytics if present
+        if (typeof gtag !== 'undefined') {
+          gtag('consent', 'update', {
+            'analytics_storage': 'denied',
+            'ad_storage': 'denied',
+            'ad_personalization': 'denied',
+            'ad_user_data': 'denied',
+            'personalization_storage': 'denied'
+          });
+        }
+        
+        // Disable Google Tag Manager if present
+        if (typeof window.dataLayer !== 'undefined') {
+          window.dataLayer.push({
+            'event': 'consent_denied',
+            'analytics_storage': 'denied',
+            'ad_storage': 'denied'
+          });
+        }
+        
+        // STEP 3: Uncheck all preference checkboxes
+        const analyticsCheckbox = document.querySelector('[data-consent-id="analytics-checkbox"]');
+        const marketingCheckbox = document.querySelector('[data-consent-id="marketing-checkbox"]');
+        const personalizationCheckbox = document.querySelector('[data-consent-id="personalization-checkbox"]');
+        
+        if (analyticsCheckbox) {
+          analyticsCheckbox.checked = false;
+        }
+        if (marketingCheckbox) {
+          marketingCheckbox.checked = false;
+        }
+        if (personalizationCheckbox) {
+          personalizationCheckbox.checked = false;
+        }
+        
+        // STEP 4: Save consent state with all preferences as false (like decline behavior)
+        const preferences = { 
+          Analytics: false, 
+          Marketing: false, 
+          Personalization: false, 
+          bannerType: locationData ? locationData.bannerType : undefined 
+        };
+        
+        setConsentState(preferences, cookieDays);
+        updateGtagConsent(preferences);
+        
+        // STEP 5: Set consent as given and save to server
+        localStorage.setItem("consent-given", "true");
+        
+        try {
+          await saveConsentStateToServer(preferences, cookieDays, false); // Exclude userAgent like decline
+        } catch (error) {
+          // Silent error handling
+        }
+        
+        // STEP 6: Hide banners
+        hideBanner(document.getElementById("main-banner"));
+        hideBanner(document.getElementById("consent-banner"));
+      };
+    }
 
-      // Cancel button (go back to main banner)
-      const cancelBtn = document.getElementById('close-consent-banner');
-      if (cancelBtn) {
-        cancelBtn.onclick = async function(e) {
-          e.preventDefault();
-          
-          // Always hide main-consent-banner when cancel is clicked
-          const mainConsentBanner = document.getElementById('main-consent-banner');
-          if (mainConsentBanner) {
-            hideBanner(mainConsentBanner);
-          }
-          
-          // Show initial banner if it exists
-          const initialConsentBanner = document.getElementById('initial-consent-banner');
-          if (initialConsentBanner) {
-            showBanner(initialConsentBanner);
-          }
-        };
+    // Cancel button (go back to main banner)
+    const cancelBtn = document.getElementById('close-consent-banner');
+    if (cancelBtn) {
+      cancelBtn.onclick = async function(e) {
+        e.preventDefault();
+        
+        // Always hide main-consent-banner when cancel is clicked
+        const mainConsentBanner = document.getElementById('main-consent-banner');
+        if (mainConsentBanner) {
+          hideBanner(mainConsentBanner);
+        }
+        
+        // Show initial banner if it exists
+        const initialConsentBanner = document.getElementById('initial-consent-banner');
+        if (initialConsentBanner) {
+          showBanner(initialConsentBanner);
+        }
+      };
+    }
+    
+    // CCPA Link Block - Show CCPA Banner
+    const ccpaLinkBlock = document.getElementById('consentbit-ccpa-linkblock');
+    if (ccpaLinkBlock) {
+      ccpaLinkBlock.onclick = function(e) {
+        e.preventDefault();
+        
+        // Show CCPA banner using showBanner function
+        const ccpaBannerDiv = document.querySelector('.consentbit-ccpa-banner-div');
+        showBanner(ccpaBannerDiv);
+        
+        // Also show the CCPA banner if it exists
+        showBanner(document.getElementById("initial-consent-banner"));
+      };
+    }
+
+    // If consent is already given, hide all banners and do not show any
+    if (consentGiven === "true") {
+      await hideAllBanners();
+      // Do not show any banner unless user clicks the icon
+      return;
+    }
+
+    // Only show banners if consent not given AND location data is available
+    if (!consentGiven && locationData) {
+      if (["CCPA", "VCDPA", "CPA", "CTDPA", "UCPA"].includes(locationData.bannerType)) {
+        // US Privacy Laws: Unblock all scripts initially (opt-out model)
+        unblockScriptsWithDataCategory();
+        showBanner(document.getElementById("initial-consent-banner"));
+        hideBanner(document.getElementById("consent-banner"));
+        
+      
+      } else {
+        // Show GDPR banner (default for EU and other locations)
+        showBanner(document.getElementById("consent-banner"));
+        hideBanner(document.getElementById("initial-consent-banner"));
+        blockScriptsByCategory();
       }
-      // CCPA Link Block - Show CCPA Banner
-      const ccpaLinkBlock = document.getElementById('consentbit-ccpa-linkblock');
-      if (ccpaLinkBlock) {
-        ccpaLinkBlock.onclick = function(e) {
-          e.preventDefault();
-          
-          // Show CCPA banner using showBanner function
-          const ccpaBannerDiv = document.querySelector('.consentbit-ccpa-banner-div');
-          showBanner(ccpaBannerDiv);
-          
-          // Also show the CCPA banner if it exists
-          showBanner(document.getElementById("initial-consent-banner"));
-        };
-      }
+    }
+    
+
       
       // Close Consent Banner functionality (CCPA only)
     
