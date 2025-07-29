@@ -721,14 +721,14 @@ async  function hideAllBanners(){
         const mainBanner = document.getElementById("main-banner");
         
         // Force show appropriate banner
-        if (locationData && locationData.bannerType === "CCPA" && ccpaBanner) {
+        if ((["CCPA", "VCDPA", "CPA", "CTDPA", "UCPA"].includes(locationData.bannerType) || locationData.country === "US") && ccpaBanner) {
           hideAllBanners();
           showBanner(ccpaBanner);
           
        
           // Update CCPA preference form with saved preferences
           updateCCPAPreferenceForm(getConsentPreferences());
-        } else if (consentBanner) {
+        }else if (consentBanner) {
           hideAllBanners();
           showBanner(consentBanner);
           
