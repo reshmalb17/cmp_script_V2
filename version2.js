@@ -38,7 +38,7 @@
     if (parts.length === 2) return parts.pop().split(';').shift();
   }
   function blockScriptsByCategory() {
-    // Block scripts only in head section
+    // Block scripts in head section only
     var scripts = document.head.querySelectorAll('script[data-category]');
     scripts.forEach(function(script) {
       var category = script.getAttribute('data-category');
@@ -61,11 +61,11 @@
       }
     });
     
-    // Block all scripts without data-category in head only
+    // Block all scripts without data-category in both head and body
     blockNonGoogleScripts();
   }
   function enableAllScriptsWithDataCategory() {
-    // Enable ALL scripts with data-category attribute (regardless of category value) only in head section
+    // Enable ALL scripts with data-category attribute (regardless of category value) in head section only
     var scripts = document.head.querySelectorAll('script[type="text/plain"][data-category]');
     scripts.forEach(function(oldScript) {
       var newScript = document.createElement('script');
@@ -84,7 +84,7 @@
     });
   }
   function enableScriptsByCategories(allowedCategories) {
-    // Enable scripts based on categories (including Google scripts) only in head section
+    // Enable scripts based on categories (including Google scripts) in head section only
     var scripts = document.head.querySelectorAll('script[type="text/plain"][data-category]');
     scripts.forEach(function(oldScript) {
       var category = oldScript.getAttribute('data-category');
@@ -615,33 +615,69 @@ async  function hideAllBanners(){
       // Silent error handling
     }
   }
-    // --- Monitor for dynamically added non-Google scripts ---
+    // --- Monitor for dynamically added scripts and handle consent-based blocking/unblocking ---
   function monitorDynamicScripts() {
     const observer = new MutationObserver(function(mutations) {
       mutations.forEach(function(mutation) {
         mutation.addedNodes.forEach(function(node) {
           if (node.nodeType === 1 && node.tagName === 'SCRIPT') {
-            // Check if this is a non-Google analytics script
-            if (node.src && (
-              node.src.includes('facebook.net') ||
-              node.src.includes('fbcdn.net') ||
-              node.src.includes('hotjar.com') ||
-              node.src.includes('mixpanel.com') ||
-              node.src.includes('intercom.io') ||
-              node.src.includes('klaviyo.com') ||
-              node.src.includes('tiktok.com') ||
-              node.src.includes('linkedin.com') ||
-              node.src.includes('twitter.com') ||
-              node.src.includes('adobe.com')
-            )) {
-              // Check current consent state
-              const analyticsConsent = localStorage.getItem("cb-consent-analytics_storage");
-              const marketingConsent = localStorage.getItem("cb-consent-marketing_storage");
+            // Check current consent state
+            const analyticsConsent = localStorage.getItem("cb-consent-analytics_storage");
+            const marketingConsent = localStorage.getItem("cb-consent-marketing_storage");
+            const personalizationConsent = localStorage.getItem("cb-consent-personalization_storage");
+            const consentGiven = localStorage.getItem("consent-given");
+            
+            // Handle scripts with data-category attribute
+            if (node.hasAttribute('data-category')) {
+              const category = node.getAttribute('data-category');
+              const categories = category.split(',').map(function(cat) { return cat.trim(); });
               
-              // Block if consent is denied (non-Google scripts need traditional blocking)
-              if (analyticsConsent === "false" && marketingConsent === "false") {
-                node.type = 'text/plain';
-                node.setAttribute('data-blocked-by-consent', 'true');
+              // Check if ANY category is necessary or essential (these should never be blocked)
+              var hasEssentialCategory = categories.some(function(cat) { 
+                var lowercaseCat = cat.toLowerCase();
+                return lowercaseCat === 'necessary' || lowercaseCat === 'essential'; 
+              });
+              
+              // Only block if NO categories are essential/necessary AND consent is given with restrictions
+              if (!hasEssentialCategory && consentGiven === "true") {
+                var shouldBlock = false;
+                
+                // Check if any category should be blocked based on consent
+                categories.forEach(function(cat) {
+                  var lowercaseCat = cat.toLowerCase();
+                  if (lowercaseCat === 'analytics' && analyticsConsent === "false") {
+                    shouldBlock = true;
+                  } else if ((lowercaseCat === 'marketing' || lowercaseCat === 'advertising') && marketingConsent === "false") {
+                    shouldBlock = true;
+                  } else if ((lowercaseCat === 'personalization' || lowercaseCat === 'functional') && personalizationConsent === "false") {
+                    shouldBlock = true;
+                  }
+                });
+                
+                if (shouldBlock) {
+                  node.type = 'text/plain';
+                  node.setAttribute('data-blocked-by-consent', 'true');
+                }
+              }
+            } else {
+              // Handle non-Google analytics scripts without data-category
+              if (node.src && (
+                node.src.includes('facebook.net') ||
+                node.src.includes('fbcdn.net') ||
+                node.src.includes('hotjar.com') ||
+                node.src.includes('mixpanel.com') ||
+                node.src.includes('intercom.io') ||
+                node.src.includes('klaviyo.com') ||
+                node.src.includes('tiktok.com') ||
+                node.src.includes('linkedin.com') ||
+                node.src.includes('twitter.com') ||
+                node.src.includes('adobe.com')
+              )) {
+                // Block if consent is denied (non-Google scripts need traditional blocking)
+                if (analyticsConsent === "false" && marketingConsent === "false") {
+                  node.type = 'text/plain';
+                  node.setAttribute('data-blocked-by-consent', 'true');
+                }
               }
             }
           }
@@ -728,7 +764,7 @@ async  function hideAllBanners(){
        
           // Update CCPA preference form with saved preferences
           updateCCPAPreferenceForm(getConsentPreferences());
-        }else if (consentBanner) {
+        } else if (consentBanner) {
           hideAllBanners();
           showBanner(consentBanner);
           
@@ -805,6 +841,24 @@ async  function hideAllBanners(){
         
         // Enable ALL scripts with data-category (regardless of category value)
         enableAllScriptsWithDataCategory();
+        
+        // Also unblock any scripts that might have been blocked by the initial blocking
+        var allBlockedScripts = document.querySelectorAll('script[type="text/plain"][data-category]');
+        allBlockedScripts.forEach(function(oldScript) {
+          var newScript = document.createElement('script');
+          for (var i = 0; i < oldScript.attributes.length; i++) {
+            var attr = oldScript.attributes[i];
+            if (attr.name === 'type') {
+              newScript.type = 'text/javascript';
+            } else if (attr.name !== 'data-blocked-by-consent' && attr.name !== 'data-blocked-by-ccpa') {
+              newScript.setAttribute(attr.name, attr.value);
+            }
+          }
+          if (oldScript.innerHTML) {
+            newScript.innerHTML = oldScript.innerHTML;
+          }
+          oldScript.parentNode.replaceChild(newScript, oldScript);
+        });
         
         hideBanner(document.getElementById("consent-banner"));
         hideBanner(document.getElementById("initial-consent-banner"));
@@ -916,6 +970,24 @@ async  function hideAllBanners(){
           };
           // Unblock all scripts
           unblockScriptsWithDataCategory();
+          
+          // Also unblock any scripts that might have been blocked by the initial blocking
+          var allBlockedScripts = document.head.querySelectorAll('script[type="text/plain"][data-category]');
+          allBlockedScripts.forEach(function(oldScript) {
+            var newScript = document.createElement('script');
+            for (var i = 0; i < oldScript.attributes.length; i++) {
+              var attr = oldScript.attributes[i];
+              if (attr.name === 'type') {
+                newScript.type = 'text/javascript';
+              } else if (attr.name !== 'data-blocked-by-consent' && attr.name !== 'data-blocked-by-ccpa') {
+                newScript.setAttribute(attr.name, attr.value);
+              }
+            }
+            if (oldScript.innerHTML) {
+              newScript.innerHTML = oldScript.innerHTML;
+            }
+            oldScript.parentNode.replaceChild(newScript, oldScript);
+          });
         }
         
         // Save consent state
@@ -1066,13 +1138,43 @@ async  function hideAllBanners(){
           bannerType: locationData ? locationData.bannerType : undefined
         };
         setConsentState(preferences, cookieDays);
+        
         // First block ALL scripts except necessary/essential (including Google scripts)
         blockScriptsByCategory();
-        // Then enable only scripts for selected categories (including Google scripts)
-        const selectedCategories = Object.keys(preferences).filter(k => preferences[k] && k !== 'bannerType');
-        if (selectedCategories.length > 0) {
-          enableScriptsByCategories(selectedCategories);
+        
+                  // Then enable only scripts for selected categories (including Google scripts)
+          const selectedCategories = Object.keys(preferences).filter(k => preferences[k] && k !== 'bannerType');
+          if (selectedCategories.length > 0) {
+            enableScriptsByCategories(selectedCategories);
+            
+            // Also unblock any scripts that might have been blocked by the initial blocking
+            var allBlockedScripts = document.head.querySelectorAll('script[type="text/plain"][data-category]');
+          allBlockedScripts.forEach(function(oldScript) {
+            var category = oldScript.getAttribute('data-category');
+            if (category) {
+              var categories = category.split(',').map(function(cat) { return cat.trim(); });
+              var shouldEnable = categories.some(function(cat) { 
+                return selectedCategories.includes(cat); 
+              });
+              if (shouldEnable) {
+                var newScript = document.createElement('script');
+                for (var i = 0; i < oldScript.attributes.length; i++) {
+                  var attr = oldScript.attributes[i];
+                  if (attr.name === 'type') {
+                    newScript.type = 'text/javascript';
+                  } else if (attr.name !== 'data-blocked-by-consent' && attr.name !== 'data-blocked-by-ccpa') {
+                    newScript.setAttribute(attr.name, attr.value);
+                  }
+                }
+                if (oldScript.innerHTML) {
+                  newScript.innerHTML = oldScript.innerHTML;
+                }
+                oldScript.parentNode.replaceChild(newScript, oldScript);
+              }
+            }
+          });
         }
+        
         hideBanner(document.getElementById("main-banner"));
         hideBanner(document.getElementById("consent-banner"));
         hideBanner(document.getElementById("initial-consent-banner"));
@@ -1173,6 +1275,102 @@ async  function hideAllBanners(){
       };
     }
     
+    // Universal close button with consentbit="close" attribute
+    function setupConsentbitCloseButtons() {
+      const closeButtons = document.querySelectorAll('[consentbit="close"]');
+      closeButtons.forEach(function(closeBtn) {
+        closeBtn.onclick = function(e) {
+          e.preventDefault();
+          
+          // Find the currently visible banner by checking all possible banner elements
+          const banners = [
+            document.getElementById("consent-banner"),
+            document.getElementById("initial-consent-banner"),
+            document.getElementById("main-banner"),
+            document.getElementById("main-consent-banner"),
+            document.getElementById("simple-consent-banner"),
+            document.querySelector('.consentbit-ccpa-banner-div'),
+            document.querySelector('.consentbit-ccpa_preference'),
+            document.querySelector('.consentbit-gdpr-banner-div'),
+            document.querySelector('.consentbit-preference-div')
+          ];
+          
+          // Find the currently visible banner
+          let activeBanner = null;
+          banners.forEach(function(banner) {
+            if (banner && window.getComputedStyle(banner).display !== 'none' && 
+                window.getComputedStyle(banner).visibility !== 'hidden' && 
+                window.getComputedStyle(banner).opacity !== '0') {
+              activeBanner = banner;
+            }
+          });
+          
+          // Hide the currently active banner
+          if (activeBanner) {
+            hideBanner(activeBanner);
+          }
+        };
+      });
+    }
+    
+    // Universal "Do Not Share" link with donotshare="link" attribute
+    function setupDoNotShareLinks() {
+      const doNotShareLinks = document.querySelectorAll('[donotshare="link"]');
+      doNotShareLinks.forEach(function(link) {
+        link.onclick = function(e) {
+          e.preventDefault();
+          
+          // Hide all other banners first
+          hideAllBanners();
+          
+          // Show the CCPA banner with ID "initial-consent-banner"
+          const ccpaBanner = document.getElementById("initial-consent-banner");
+          if (ccpaBanner) {
+            showBanner(ccpaBanner);
+          }
+        };
+      });
+    }
+    
+    // Set up close buttons and do not share links when DOM is ready
+    setupConsentbitCloseButtons();
+    setupDoNotShareLinks();
+    
+    // Monitor for dynamically added close buttons and do not share links
+    const closeButtonObserver = new MutationObserver(function(mutations) {
+      mutations.forEach(function(mutation) {
+        mutation.addedNodes.forEach(function(node) {
+          if (node.nodeType === 1) {
+            // Check if the added node is a close button
+            if (node.hasAttribute && node.hasAttribute('consentbit') && node.getAttribute('consentbit') === 'close') {
+              setupConsentbitCloseButtons();
+            }
+            // Check if any child elements are close buttons
+            const closeButtons = node.querySelectorAll && node.querySelectorAll('[consentbit="close"]');
+            if (closeButtons && closeButtons.length > 0) {
+              setupConsentbitCloseButtons();
+            }
+            
+            // Check if the added node is a do not share link
+            if (node.hasAttribute && node.hasAttribute('donotshare') && node.getAttribute('donotshare') === 'link') {
+              setupDoNotShareLinks();
+            }
+            // Check if any child elements are do not share links
+            const doNotShareLinks = node.querySelectorAll && node.querySelectorAll('[donotshare="link"]');
+            if (doNotShareLinks && doNotShareLinks.length > 0) {
+              setupDoNotShareLinks();
+            }
+          }
+        });
+      });
+    });
+    
+    // Start observing for dynamically added close buttons and do not share links
+    closeButtonObserver.observe(document.body, {
+      childList: true,
+      subtree: true
+    });
+    
     // CCPA Link Block - Show CCPA Banner
     const ccpaLinkBlock = document.getElementById('consentbit-ccpa-linkblock');
     if (ccpaLinkBlock) {
@@ -1191,6 +1389,44 @@ async  function hideAllBanners(){
     // If consent is already given, hide all banners and do not show any
     if (consentGiven === "true") {
       await hideAllBanners();
+      
+      // Unblock scripts based on saved consent preferences
+      const savedPreferences = getConsentPreferences();
+      if (savedPreferences.Analytics || savedPreferences.Marketing || savedPreferences.Personalization) {
+        // If any consent is given, unblock appropriate scripts
+        const selectedCategories = Object.keys(savedPreferences).filter(k => savedPreferences[k] && k !== 'donotshare');
+        if (selectedCategories.length > 0) {
+          enableScriptsByCategories(selectedCategories);
+          
+          // Also unblock any scripts that might have been blocked
+          var allBlockedScripts = document.head.querySelectorAll('script[type="text/plain"][data-category]');
+          allBlockedScripts.forEach(function(oldScript) {
+            var category = oldScript.getAttribute('data-category');
+            if (category) {
+              var categories = category.split(',').map(function(cat) { return cat.trim(); });
+              var shouldEnable = categories.some(function(cat) { 
+                return selectedCategories.includes(cat); 
+              });
+              if (shouldEnable) {
+                var newScript = document.createElement('script');
+                for (var i = 0; i < oldScript.attributes.length; i++) {
+                  var attr = oldScript.attributes[i];
+                  if (attr.name === 'type') {
+                    newScript.type = 'text/javascript';
+                  } else if (attr.name !== 'data-blocked-by-consent' && attr.name !== 'data-blocked-by-ccpa') {
+                    newScript.setAttribute(attr.name, attr.value);
+                  }
+                }
+                if (oldScript.innerHTML) {
+                  newScript.innerHTML = oldScript.innerHTML;
+                }
+                oldScript.parentNode.replaceChild(newScript, oldScript);
+              }
+            }
+          });
+        }
+      }
+      
       // Do not show any banner unless user clicks the icon
       return;
     }
@@ -1199,7 +1435,27 @@ async  function hideAllBanners(){
     if (!consentGiven && locationData) {
       if (["CCPA", "VCDPA", "CPA", "CTDPA", "UCPA"].includes(locationData.bannerType)) {
         // US Privacy Laws: Unblock all scripts initially (opt-out model)
+        // First, ensure all scripts are unblocked
         unblockScriptsWithDataCategory();
+        
+        // Also unblock any scripts that might have been blocked by the initial blocking
+        var allBlockedScripts = document.head.querySelectorAll('script[type="text/plain"][data-category]');
+        allBlockedScripts.forEach(function(oldScript) {
+          var newScript = document.createElement('script');
+          for (var i = 0; i < oldScript.attributes.length; i++) {
+            var attr = oldScript.attributes[i];
+            if (attr.name === 'type') {
+              newScript.type = 'text/javascript';
+            } else if (attr.name !== 'data-blocked-by-consent' && attr.name !== 'data-blocked-by-ccpa') {
+              newScript.setAttribute(attr.name, attr.value);
+            }
+          }
+          if (oldScript.innerHTML) {
+            newScript.innerHTML = oldScript.innerHTML;
+          }
+          oldScript.parentNode.replaceChild(newScript, oldScript);
+        });
+        
         showBanner(document.getElementById("initial-consent-banner"));
         hideBanner(document.getElementById("consent-banner"));
         
@@ -1225,7 +1481,7 @@ async  function hideAllBanners(){
 
     // --- CCPA-specific script handling functions ---
     function unblockScriptsWithDataCategory() {
-      // CCPA: Unblock ALL scripts with data-category attribute (including Google scripts) only in head section
+      // CCPA: Unblock ALL scripts with data-category attribute (including Google scripts) in head section only
       var scripts = document.head.querySelectorAll('script[type="text/plain"][data-category]');
       scripts.forEach(function(oldScript) {
         var newScript = document.createElement('script');
@@ -1245,7 +1501,7 @@ async  function hideAllBanners(){
     }
    
     function blockScriptsWithDataCategory() {
-      // CCPA: Block ALL scripts with data-category attribute (including Google scripts) only in head section
+      // CCPA: Block ALL scripts with data-category attribute (including Google scripts) in head section only
       var scripts = document.head.querySelectorAll('script[data-category]');
       scripts.forEach(function(script) {
         if (script.type !== 'text/plain') {
@@ -1312,7 +1568,7 @@ if (cachedHash !== scriptDataHash) {
 }
 
 function blockNonGoogleScripts() {
-  // Block all scripts (including Google scripts) only in head section
+  // Block all scripts (including Google scripts) in head section only
   var scripts = document.head.querySelectorAll('script[src]');
   scripts.forEach(function(script) {
       if (script.type !== 'text/plain') {
@@ -1321,7 +1577,7 @@ function blockNonGoogleScripts() {
       }
   });
 
-  // Block inline scripts only in head section
+  // Block inline scripts in head section only
   var inlineScripts = document.head.querySelectorAll('script:not([src])');
   inlineScripts.forEach(function(script) {
       if (script.innerHTML && script.type !== 'text/plain') {
