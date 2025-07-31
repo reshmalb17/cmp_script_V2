@@ -1431,42 +1431,57 @@ async  function hideAllBanners(){
       return;
     }
 
-    // Only show banners if consent not given AND location data is available
-    if (!consentGiven && locationData) {
-      if (["CCPA", "VCDPA", "CPA", "CTDPA", "UCPA"].includes(locationData.bannerType)) {
-        // US Privacy Laws: Unblock all scripts initially (opt-out model)
-        // First, ensure all scripts are unblocked
-        unblockScriptsWithDataCategory();
-        
-        // Also unblock any scripts that might have been blocked by the initial blocking
-        var allBlockedScripts = document.head.querySelectorAll('script[type="text/plain"][data-category]');
-        allBlockedScripts.forEach(function(oldScript) {
-          var newScript = document.createElement('script');
-          for (var i = 0; i < oldScript.attributes.length; i++) {
-            var attr = oldScript.attributes[i];
-            if (attr.name === 'type') {
-              newScript.type = 'text/javascript';
-            } else if (attr.name !== 'data-blocked-by-consent' && attr.name !== 'data-blocked-by-ccpa') {
-              newScript.setAttribute(attr.name, attr.value);
-            }
+      // Only show banners if consent not given AND location data is available
+  if (!consentGiven && locationData) {
+    if (["CCPA", "VCDPA", "CPA", "CTDPA", "UCPA"].includes(locationData.bannerType)) {
+      // US Privacy Laws: Ensure all scripts are unblocked initially (opt-out model)
+      // For CCPA, scripts should start as text/javascript, not text/plain
+      var allBlockedScripts = document.head.querySelectorAll('script[type="text/plain"][data-category]');
+      allBlockedScripts.forEach(function(oldScript) {
+        var newScript = document.createElement('script');
+        for (var i = 0; i < oldScript.attributes.length; i++) {
+          var attr = oldScript.attributes[i];
+          if (attr.name === 'type') {
+            newScript.type = 'text/javascript';
+          } else if (attr.name !== 'data-blocked-by-consent' && attr.name !== 'data-blocked-by-ccpa') {
+            newScript.setAttribute(attr.name, attr.value);
           }
-          if (oldScript.innerHTML) {
-            newScript.innerHTML = oldScript.innerHTML;
-          }
-          oldScript.parentNode.replaceChild(newScript, oldScript);
-        });
-        
-        showBanner(document.getElementById("initial-consent-banner"));
-        hideBanner(document.getElementById("consent-banner"));
-        
+        }
+        if (oldScript.innerHTML) {
+          newScript.innerHTML = oldScript.innerHTML;
+        }
+        oldScript.parentNode.replaceChild(newScript, oldScript);
+      });
       
-      } else {
-        // Show GDPR banner (default for EU and other locations)
-        showBanner(document.getElementById("consent-banner"));
-        hideBanner(document.getElementById("initial-consent-banner"));
-        blockScriptsByCategory();
-      }
+      // Also unblock any scripts that might have been blocked by initial blocking
+      var allBlockedScripts2 = document.head.querySelectorAll('script[type="text/plain"]');
+      allBlockedScripts2.forEach(function(oldScript) {
+        var newScript = document.createElement('script');
+        for (var i = 0; i < oldScript.attributes.length; i++) {
+          var attr = oldScript.attributes[i];
+          if (attr.name === 'type') {
+            newScript.type = 'text/javascript';
+          } else if (attr.name !== 'data-blocked-by-consent' && attr.name !== 'data-blocked-by-ccpa') {
+            newScript.setAttribute(attr.name, attr.value);
+          }
+        }
+        if (oldScript.innerHTML) {
+          newScript.innerHTML = oldScript.innerHTML;
+        }
+        oldScript.parentNode.replaceChild(newScript, oldScript);
+      });
+      
+      showBanner(document.getElementById("initial-consent-banner"));
+      hideBanner(document.getElementById("consent-banner"));
+      
+    
+    } else {
+      // Show GDPR banner (default for EU and other locations)
+      showBanner(document.getElementById("consent-banner"));
+      hideBanner(document.getElementById("initial-consent-banner"));
+      blockScriptsByCategory();
     }
+  }
     
 
       
