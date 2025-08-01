@@ -114,12 +114,12 @@
   function updateGtagConsent(preferences) {
     if (typeof gtag === "function") {
       gtag('consent', 'update', {
-        'analytics_storage': preferences.Analytics ? 'granted' : 'denied',
+        'analytics_storage': preferences.analytics ? 'granted' : 'denied',
         'functionality_storage': 'granted',
-        'ad_storage': preferences.Marketing ? 'granted' : 'denied',
-        'ad_personalization': preferences.Marketing ? 'granted' : 'denied',
-        'ad_user_data': preferences.Marketing ? 'granted' : 'denied',
-        'personalization_storage': preferences.Personalization ? 'granted' : 'denied',
+        'ad_storage': preferences.marketing ? 'granted' : 'denied',
+        'ad_personalization': preferences.marketing ? 'granted' : 'denied',
+        'ad_user_data': preferences.marketing ? 'granted' : 'denied',
+        'personalization_storage': preferences.personalization ? 'granted' : 'denied',
         'security_storage': 'granted'
       });
     }
@@ -128,16 +128,16 @@
     if (typeof window.dataLayer !== 'undefined') {
       window.dataLayer.push({
         'event': 'consent_update',
-        'consent_analytics': preferences.Analytics,
-        'consent_marketing': preferences.Marketing,
-        'consent_personalization': preferences.Personalization
+        'consent_analytics': preferences.analytics,
+        'consent_marketing': preferences.marketing,
+        'consent_personalization': preferences.personalization
       });
     }
   }
   function setConsentState(preferences, cookieDays) {
-    ['Analytics', 'Marketing', 'Personalization'].forEach(function(category) {
+    ['analytics', 'marketing', 'personalization'].forEach(function(category) {
       setConsentCookie(
-        'cb-consent-' + category.toLowerCase() + '_storage',
+        'cb-consent-' + category + '_storage',
         preferences[category] ? 'true' : 'false',
         cookieDays || 365
       );
@@ -159,9 +159,9 @@
   }
   function getConsentPreferences() {
     return {
-      Analytics: getConsentCookie('cb-consent-analytics_storage') === 'true',
-      Marketing: getConsentCookie('cb-consent-marketing_storage') === 'true',
-      Personalization: getConsentCookie('cb-consent-personalization_storage') === 'true',
+      analytics: getConsentCookie('cb-consent-analytics_storage') === 'true',
+      marketing: getConsentCookie('cb-consent-marketing_storage') === 'true',
+      personalization: getConsentCookie('cb-consent-personalization_storage') === 'true',
       donotshare: getConsentCookie('cb-consent-donotshare') === 'true'
     };
   }
@@ -763,7 +763,7 @@ async  function hideAllBanners(){
         const mainBanner = document.getElementById("main-banner");
         
         // Force show appropriate banner
-        if ((["CCPA", "VCDPA", "CPA", "CTDPA", "UCPA"].includes(locationData.bannerType) || locationData.country === "US") && ccpaBanner) {
+        if (locationData && (["CCPA", "VCDPA", "CPA", "CTDPA", "UCPA"].includes(locationData.bannerType) || locationData.country === "US") && ccpaBanner) {
           hideAllBanners();
           showBanner(ccpaBanner);
           
