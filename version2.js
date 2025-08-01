@@ -945,7 +945,8 @@ async  function hideAllBanners(){
             analytics: false, 
             marketing: false, 
             personalization: false,
-            donotshare: true,
+            doNotShare: true,  // Changed to camelCase to match server expectation
+            doNotSell: true,   // Added to match server expectation
             action: 'rejection',
             bannerType: locationData ? locationData.bannerType : undefined 
           };
@@ -971,7 +972,8 @@ async  function hideAllBanners(){
             analytics: true, 
             marketing: true, 
             personalization: true,
-            donotshare: false,
+            doNotShare: false,  // Changed to camelCase to match server expectation
+            doNotSell: false,   // Added to match server expectation
             action: 'acceptance',
             bannerType: locationData ? locationData.bannerType : undefined 
           };
@@ -1027,7 +1029,8 @@ async  function hideAllBanners(){
           analytics: false, 
           marketing: false, 
           personalization: false, 
-          donotshare: true, // CCPA Decline means do not share = true
+          doNotShare: true, // CCPA Decline means do not share = true
+          doNotSell: true,  // CCPA Decline means do not sell = true
           action: 'rejection',
           bannerType: locationData ? locationData.bannerType : undefined 
         };
@@ -1071,7 +1074,8 @@ async  function hideAllBanners(){
             analytics: false, 
             marketing: false, 
             personalization: false,
-            donotshare: true,
+            doNotShare: true,  // Changed to camelCase to match server expectation
+            doNotSell: true,   // Added to match server expectation
             action: 'rejection',
             bannerType: locationData ? locationData.bannerType : undefined 
           };
@@ -1082,7 +1086,8 @@ async  function hideAllBanners(){
             analytics: true, 
             marketing: true, 
             personalization: true,
-            donotshare: false,
+            doNotShare: false,  // Changed to camelCase to match server expectation
+            doNotSell: false,   // Added to match server expectation
             action: 'acceptance',
             bannerType: locationData ? locationData.bannerType : undefined 
           };
