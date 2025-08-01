@@ -836,7 +836,7 @@ async  function hideAllBanners(){
     if (acceptBtn) {
       acceptBtn.onclick = async function(e) {
         e.preventDefault();
-        const preferences = { Analytics: true, Marketing: true, Personalization: true, donotshare: false, bannerType: locationData ? locationData.bannerType : undefined };
+        const preferences = { Analytics: true, Marketing: true, Personalization: true, donotshare: false, action: 'acceptance', bannerType: locationData ? locationData.bannerType : undefined };
         setConsentState(preferences, cookieDays);
         
         // Enable ALL scripts with data-category (regardless of category value)
@@ -874,7 +874,7 @@ async  function hideAllBanners(){
     if (declineBtn) {
       declineBtn.onclick = async function(e) {
         e.preventDefault();
-        const preferences = { Analytics: false, Marketing: false, Personalization: false, donotshare: true, bannerType: locationData ? locationData.bannerType : undefined };
+        const preferences = { Analytics: false, Marketing: false, Personalization: false, donotshare: true, action: 'rejection', bannerType: locationData ? locationData.bannerType : undefined };
         
         // Update Google Consent v2 to deny tracking (let Google handle privacy-preserving mode)
         if (typeof gtag === "function") {
@@ -941,6 +941,7 @@ async  function hideAllBanners(){
             Marketing: false, 
             Personalization: false,
             donotshare: true,
+            action: 'rejection',
             bannerType: locationData ? locationData.bannerType : undefined 
           };
           
@@ -966,6 +967,7 @@ async  function hideAllBanners(){
             Marketing: true, 
             Personalization: true,
             donotshare: false,
+            action: 'acceptance',
             bannerType: locationData ? locationData.bannerType : undefined 
           };
           // Unblock all scripts
@@ -1021,6 +1023,7 @@ async  function hideAllBanners(){
           Marketing: false, 
           Personalization: false, 
           donotshare: true, // CCPA Decline means do not share = true
+          action: 'rejection',
           bannerType: locationData ? locationData.bannerType : undefined 
         };
         
@@ -1135,6 +1138,7 @@ async  function hideAllBanners(){
           Analytics: analytics,
           Marketing: marketing,
           Personalization: personalization,
+          action: (analytics || marketing || personalization) ? 'acceptance' : 'rejection',
           bannerType: locationData ? locationData.bannerType : undefined
         };
         setConsentState(preferences, cookieDays);
