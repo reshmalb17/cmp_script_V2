@@ -520,13 +520,13 @@ async  function hideAllBanners(){
       necessaryCheckbox.disabled = true;
     }
     if (marketingCheckbox) {
-      marketingCheckbox.checked = Boolean(preferences.Marketing);
+      marketingCheckbox.checked = Boolean(preferences.marketing);
     }
     if (personalizationCheckbox) {
-      personalizationCheckbox.checked = Boolean(preferences.Personalization);
+      personalizationCheckbox.checked = Boolean(preferences.personalization);
     }
     if (analyticsCheckbox) {
-      analyticsCheckbox.checked = Boolean(preferences.Analytics);
+      analyticsCheckbox.checked = Boolean(preferences.analytics);
     }
   }
 
@@ -540,7 +540,7 @@ async  function hideAllBanners(){
         doNotShareCheckbox.checked = preferences.donotshare;
       } else {
         // Fallback: If any category is false (blocked), then "Do Not Share" should be checked
-        const shouldCheck = !preferences.Analytics || !preferences.Marketing || !preferences.Personalization;
+        const shouldCheck = !preferences.analytics || !preferences.marketing || !preferences.personalization;
         doNotShareCheckbox.checked = shouldCheck;
       }
     }
@@ -551,11 +551,11 @@ async  function hideAllBanners(){
       const checkboxName = checkbox.name || checkbox.getAttribute('data-category') || '';
       // In CCPA, checked means "Do Not Share" (block/false)
       if (checkboxName.toLowerCase().includes('analytics')) {
-        checkbox.checked = !Boolean(preferences.Analytics);
+        checkbox.checked = !Boolean(preferences.analytics);
       } else if (checkboxName.toLowerCase().includes('marketing') || checkboxName.toLowerCase().includes('advertising')) {
-        checkbox.checked = !Boolean(preferences.Marketing);
+        checkbox.checked = !Boolean(preferences.marketing);
       } else if (checkboxName.toLowerCase().includes('personalization') || checkboxName.toLowerCase().includes('functional')) {
-        checkbox.checked = !Boolean(preferences.Personalization);
+        checkbox.checked = !Boolean(preferences.personalization);
       }
     });
   }
@@ -1403,7 +1403,7 @@ async  function hideAllBanners(){
       
       // Unblock scripts based on saved consent preferences
       const savedPreferences = getConsentPreferences();
-      if (savedPreferences.Analytics || savedPreferences.Marketing || savedPreferences.Personalization) {
+      if (savedPreferences.analytics || savedPreferences.marketing || savedPreferences.personalization) {
         // If any consent is given, unblock appropriate scripts
         const selectedCategories = Object.keys(savedPreferences).filter(k => savedPreferences[k] && k !== 'donotshare');
         if (selectedCategories.length > 0) {
