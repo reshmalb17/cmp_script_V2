@@ -1323,9 +1323,10 @@ async  function hideAllBanners(){
       });
     }
     
-    // Universal "Do Not Share" link with donotshare="link" attribute
+    // Universal "Do Not Share" link with consentbit-data-donotshare="consentbit-link-donotshare" attribute
     function setupDoNotShareLinks() {
-      const doNotShareLinks = document.querySelectorAll('[donotshare="link"]');
+      const doNotShareLinks = document.querySelectorAll('[consentbit-data-donotshare="consentbit-link-donotshare"]');
+      console.log('[CONSENT-DEBUG] Do not share links:', doNotShareLinks);
       doNotShareLinks.forEach(function(link) {
         link.onclick = function(e) {
           e.preventDefault();
@@ -1336,6 +1337,7 @@ async  function hideAllBanners(){
           // Show the CCPA banner with ID "initial-consent-banner"
           const ccpaBanner = document.getElementById("initial-consent-banner");
           if (ccpaBanner) {
+            console.log('[CONSENT-DEBUG] Showing CCPA banner:', ccpaBanner);
             showBanner(ccpaBanner);
           }
         };
@@ -1362,14 +1364,10 @@ async  function hideAllBanners(){
             }
             
             // Check if the added node is a do not share link
-            if (node.hasAttribute && node.hasAttribute('donotshare') && node.getAttribute('donotshare') === 'link') {
+            if (node.hasAttribute && node.hasAttribute('consentbit-data-donotshare') && node.getAttribute('consentbit-data-donotshare') === 'consentbit-link-donotshare') {
               setupDoNotShareLinks();
             }
-            // Check if any child elements are do not share links
-            const doNotShareLinks = node.querySelectorAll && node.querySelectorAll('[donotshare="link"]');
-            if (doNotShareLinks && doNotShareLinks.length > 0) {
-              setupDoNotShareLinks();
-            }
+          
           }
         });
       });
