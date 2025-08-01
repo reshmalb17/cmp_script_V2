@@ -456,7 +456,6 @@ async  function hideAllBanners(){
       }
 
       // Debug: Log what we're sending to server
-      console.log('[CONSENT-DEBUG] Preferences being sent to server:', preferences);
 
       // Prepare the complete payload first
       const fullPayload = {
@@ -486,7 +485,6 @@ async  function hideAllBanners(){
       };
 
       // Debug: Log the full payload being sent
-      console.log('[CONSENT-DEBUG] Full payload being sent:', fullPayload);
 
       const response = await fetch("https://cb-server.web-8fb.workers.dev/api/v2/cmp/consent", {
         method: "POST",
@@ -790,7 +788,6 @@ async  function hideAllBanners(){
         const retryToken = await getVisitorSessionToken();
         if (!retryToken) {
           // Only reload if we absolutely can't get a token after retry
-          console.warn('Failed to get visitor token after retry, reloading page');
           setTimeout(() => location.reload(), 3000);
           return;
         }
@@ -811,7 +808,6 @@ async  function hideAllBanners(){
         return;
       }
     } catch (error) {
-      console.error('Error in token/status check:', error);
       // Don't immediately reload on error, try to continue
       clearVisitorSession();
       // Only reload if critical functionality fails
@@ -954,7 +950,6 @@ async  function hideAllBanners(){
           // Apply law-specific blocking based on banner type
           if (locationData && ["VCDPA", "CPA", "CTDPA", "UCPA"].includes(locationData.bannerType)) {
             // Enhanced privacy laws with granular opt-out requirements
-            console.log(`[CONSENT-FLOW] Applying granular blocking for ${locationData.bannerType}`);
             blockTargetedAdvertisingScripts();
             blockSaleScripts();
             blockProfilingScripts();
@@ -962,7 +957,6 @@ async  function hideAllBanners(){
             blockAutomatedDecisionScripts();
           } else {
             // CCPA - block all scripts  
-            console.log('[CONSENT-FLOW] Applying CCPA script blocking');
             blockScriptsWithDataCategory();
             blockNonGoogleScripts();
           }
@@ -1560,11 +1554,6 @@ async function scanAndSendHeadScriptsIfChanged(sessionToken) {
   const scriptDataHash = await hashStringSHA256(scriptDataString);
 
   const cachedHash = localStorage.getItem('headScriptsHash');
-  console.log('Current scriptDataHash:', scriptDataHash);
-console.log('Cached hash:', cachedHash);
-if (cachedHash !== scriptDataHash) {
-  console.log('Hash changed, sending POST to /api/cmp/head-scripts');
-}
   if (cachedHash === scriptDataHash) {
     return; // No change, do nothing
   }
@@ -1589,12 +1578,9 @@ if (cachedHash !== scriptDataHash) {
     
     if (response.ok) {
       localStorage.setItem('headScriptsHash', scriptDataHash);
-      console.log('Head scripts processed and cached successfully');
-    } else {
-      console.error('Failed to send head scripts to API:', response.status);
     }
   } catch (e) {
-    console.error('Error sending head scripts to API:', e);
+    // Silent error handling
   }
 }
 
