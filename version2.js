@@ -1330,15 +1330,22 @@ async  function hideAllBanners(){
       doNotShareLinks.forEach(function(link) {
         link.onclick = function(e) {
           e.preventDefault();
+          console.log('[CONSENT-DEBUG] Do not share link clicked');
           
           // Hide all other banners first
           hideAllBanners();
           
           // Show the CCPA banner with ID "initial-consent-banner"
           const ccpaBanner = document.getElementById("initial-consent-banner");
+          console.log('[CONSENT-DEBUG] Looking for CCPA banner with ID "initial-consent-banner":', ccpaBanner);
           if (ccpaBanner) {
             console.log('[CONSENT-DEBUG] Showing CCPA banner:', ccpaBanner);
             showBanner(ccpaBanner);
+          } else {
+            console.log('[CONSENT-DEBUG] CCPA banner not found. Available banners:');
+            console.log('[CONSENT-DEBUG] - initial-consent-banner:', document.getElementById("initial-consent-banner"));
+            console.log('[CONSENT-DEBUG] - consent-banner:', document.getElementById("consent-banner"));
+            console.log('[CONSENT-DEBUG] - main-banner:', document.getElementById("main-banner"));
           }
         };
       });
