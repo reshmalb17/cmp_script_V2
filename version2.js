@@ -134,7 +134,7 @@
       });
     }
   }
-  function setConsentState(preferences, cookieDays) {
+  async function setConsentState(preferences, cookieDays) {
     ['analytics', 'marketing', 'personalization'].forEach(function(category) {
       setConsentCookie(
         'cb-consent-' + category + '_storage',
@@ -144,25 +144,73 @@
     });
     
     // Save CCPA "do-not-share" preference if it exists
-    if (preferences.hasOwnProperty('donotshare')) {
+    if (preferences.hasOwnProperty('doNotShare')) {
       setConsentCookie(
         'cb-consent-donotshare',
-        preferences.donotshare ? 'true' : 'false',
+        preferences.doNotShare ? 'true' : 'false',
         cookieDays || 365
       );
     }
+    
+    // Store encrypted preferences in localStorage
+    await storeEncryptedPreferences(preferences);
     
     updateGtagConsent(preferences);
     const expiresAt = Date.now() + (cookieDays * 24 * 60 * 60 * 1000);
     localStorage.setItem('consentExpiresAt', expiresAt.toString());
     localStorage.setItem('consentExpirationDays', cookieDays.toString());
   }
-  function getConsentPreferences() {
+  // Encrypt and store preferences in localStorage
+  async function storeEncryptedPreferences(preferences) {
+    try {
+      const preferencesString = JSON.stringify(preferences);
+      const encryptedData = await encryptWithHardcodedKey(preferencesString);
+      localStorage.setItem('encrypted-consent-preferences', encryptedData);
+    } catch (error) {
+      // Silent error handling
+    }
+  }
+
+  // Decrypt and retrieve preferences from localStorage
+  async function getDecryptedPreferences() {
+    try {
+      const encryptedData = localStorage.getItem('encrypted-consent-preferences');
+      if (!encryptedData) {
+        return null;
+      }
+      
+      // Decrypt the data
+      const key = await importHardcodedKey();
+      const iv = base64ToUint8Array(ENCRYPTION_IV);
+      const encryptedBytes = base64ToUint8Array(encryptedData);
+      
+      const decryptedBuffer = await crypto.subtle.decrypt(
+        { name: "AES-GCM", iv },
+        key,
+        encryptedBytes
+      );
+      
+      const decryptedString = new TextDecoder().decode(decryptedBuffer);
+      return JSON.parse(decryptedString);
+    } catch (error) {
+      // Silent error handling
+      return null;
+    }
+  }
+
+  async function getConsentPreferences() {
+    // Try to get from encrypted localStorage first
+    const encryptedPrefs = await getDecryptedPreferences();
+    if (encryptedPrefs) {
+      return encryptedPrefs;
+    }
+    
+    // Fallback to cookies for backward compatibility
     return {
       analytics: getConsentCookie('cb-consent-analytics_storage') === 'true',
       marketing: getConsentCookie('cb-consent-marketing_storage') === 'true',
       personalization: getConsentCookie('cb-consent-personalization_storage') === 'true',
-      donotshare: getConsentCookie('cb-consent-donotshare') === 'true'
+      doNotShare: getConsentCookie('cb-consent-donotshare') === 'true'  // Convert to camelCase for consistency
     };
   }
   function showBanner(banner) {
@@ -513,11 +561,14 @@ async  function hideAllBanners(){
     const marketingCheckbox = document.querySelector('[data-consent-id="marketing-checkbox"]');
     const personalizationCheckbox = document.querySelector('[data-consent-id="personalization-checkbox"]');
     const analyticsCheckbox = document.querySelector('[data-consent-id="analytics-checkbox"]');
+    
+
+    
     if (necessaryCheckbox) {
       necessaryCheckbox.checked = true;
       necessaryCheckbox.disabled = true;
     }
-    if (marketingCheckbox) {
+        if (marketingCheckbox) {
       marketingCheckbox.checked = Boolean(preferences.marketing);
     }
     if (personalizationCheckbox) {
@@ -532,9 +583,15 @@ async  function hideAllBanners(){
   function updateCCPAPreferenceForm(preferences) {
     // Update main "Do Not Share" checkbox based on saved preference
     const doNotShareCheckbox = document.querySelector('[data-consent-id="do-not-share-checkbox"]');
+    
+
+    
     if (doNotShareCheckbox) {
-      // Use saved donotshare preference if available, otherwise check if any category is false
-      if (preferences.hasOwnProperty('donotshare')) {
+      // Use saved doNotShare preference if available (camelCase for encrypted storage)
+      // or donotshare preference if available (lowercase for cookie fallback)
+      if (preferences.hasOwnProperty('doNotShare')) {
+        doNotShareCheckbox.checked = preferences.doNotShare;
+      } else if (preferences.hasOwnProperty('donotshare')) {
         doNotShareCheckbox.checked = preferences.donotshare;
       } else {
         // Fallback: If any category is false (blocked), then "Do Not Share" should be checked
@@ -766,16 +823,22 @@ async  function hideAllBanners(){
           showBanner(ccpaBanner);
           
        
-          // Update CCPA preference form with saved preferences
-          updateCCPAPreferenceForm(getConsentPreferences());
+          // Update CCPA preference form with saved preferences - with delay to ensure elements are rendered
+          setTimeout(async () => {
+            const preferences = await getConsentPreferences();
+            updateCCPAPreferenceForm(preferences);
+          }, 100);
         } else if (consentBanner) {
           hideAllBanners();
           showBanner(consentBanner);
         }
         
-        // Update preferences if function exists
+        // Update preferences if function exists - with delay to ensure elements are rendered
         if (typeof updatePreferenceForm === 'function') {
-          updatePreferenceForm(getConsentPreferences());
+          setTimeout(async () => {
+            const preferences = await getConsentPreferences();
+            updatePreferenceForm(preferences);
+          }, 100);
         }
       };
     }
@@ -826,7 +889,7 @@ async  function hideAllBanners(){
 
     const consentGiven = localStorage.getItem("consent-given");
     let cookieDays = await fetchCookieExpirationDays();
-    const prefs = getConsentPreferences();
+    const prefs = await getConsentPreferences();
     updatePreferenceForm(prefs);
 
     // Set up ALL button handlers BEFORE checking consent state
@@ -837,8 +900,8 @@ async  function hideAllBanners(){
     if (acceptBtn) {
       acceptBtn.onclick = async function(e) {
         e.preventDefault();
-        const preferences = { analytics: true, marketing: true, personalization: true, donotshare: false, action: 'acceptance', bannerType: locationData ? locationData.bannerType : undefined };
-        setConsentState(preferences, cookieDays);
+        const preferences = { analytics: true, marketing: true, personalization: true, doNotShare: false, action: 'acceptance', bannerType: locationData ? locationData.bannerType : undefined };
+        await setConsentState(preferences, cookieDays);
         
         // Enable ALL scripts with data-category (regardless of category value)
         enableAllScriptsWithDataCategory();
@@ -874,7 +937,7 @@ async  function hideAllBanners(){
     if (declineBtn) {
       declineBtn.onclick = async function(e) {
         e.preventDefault();
-        const preferences = { analytics: false, marketing: false, personalization: false, donotshare: true, action: 'rejection', bannerType: locationData ? locationData.bannerType : undefined };
+        const preferences = { analytics: false, marketing: false, personalization: false, doNotShare: true, action: 'rejection', bannerType: locationData ? locationData.bannerType : undefined };
         
         // Update Google Consent v2 to deny tracking (let Google handle privacy-preserving mode)
         if (typeof gtag === "function") {
@@ -890,7 +953,7 @@ async  function hideAllBanners(){
         }
         
         // Set consent state and block ALL scripts (including Google scripts)
-        setConsentState(preferences, cookieDays);
+        await setConsentState(preferences, cookieDays);
         blockScriptsByCategory();
         hideBanner(document.getElementById("consent-banner"));
         hideBanner(document.getElementById("initial-consent-banner"));
@@ -903,7 +966,7 @@ async  function hideAllBanners(){
     // Do Not Share (CCPA)
     const doNotShareBtn = document.getElementById('do-not-share-link');
     if (doNotShareBtn) {
-      doNotShareBtn.onclick = function(e) {
+      doNotShareBtn.onclick = async function(e) {
         e.preventDefault();
         
         // Hide initial CCPA banner with FORCE
@@ -918,7 +981,8 @@ async  function hideAllBanners(){
           showBanner(mainBanner);
           
           // Update CCPA preference form with saved preferences
-          updateCCPAPreferenceForm(getConsentPreferences());
+          const preferences = await getConsentPreferences();
+          updateCCPAPreferenceForm(preferences);
         }
       };
     }
@@ -992,7 +1056,7 @@ async  function hideAllBanners(){
         }
         
         // Save consent state
-        setConsentState(preferences, cookieDays);
+        await setConsentState(preferences, cookieDays);
         
         // Hide banners
         hideBanner(document.getElementById("initial-consent-banner"));
@@ -1027,7 +1091,7 @@ async  function hideAllBanners(){
         };
         
         // Save consent state
-        setConsentState(preferences, cookieDays);
+        await setConsentState(preferences, cookieDays);
         
         // Block all scripts (including Google scripts)
         blockScriptsByCategory();
@@ -1085,7 +1149,7 @@ async  function hideAllBanners(){
         }
         
         // Save consent state
-        setConsentState(preferences, cookieDays);
+        await setConsentState(preferences, cookieDays);
         
         // Handle script blocking/unblocking based on checkbox state (including Google scripts)
         if (doNotShareCheckbox && doNotShareCheckbox.checked) {
@@ -1118,11 +1182,12 @@ async  function hideAllBanners(){
     // Preferences button (show preferences panel)
     const preferencesBtn = document.getElementById('preferences-btn');
     if (preferencesBtn) {
-      preferencesBtn.onclick = function(e) {
+      preferencesBtn.onclick = async function(e) {
         e.preventDefault();
         hideBanner(document.getElementById("consent-banner"));
         showBanner(document.getElementById("main-banner"));
-        updatePreferenceForm(getConsentPreferences());
+        const preferences = await getConsentPreferences();
+        updatePreferenceForm(preferences);
       };
     }
     
@@ -1142,7 +1207,7 @@ async  function hideAllBanners(){
           action: (analytics || marketing || personalization) ? 'acceptance' : 'rejection',
           bannerType: locationData ? locationData.bannerType : undefined
         };
-        setConsentState(preferences, cookieDays);
+        await setConsentState(preferences, cookieDays);
         
         // First block ALL scripts except necessary/essential (including Google scripts)
         blockScriptsByCategory();
@@ -1241,7 +1306,7 @@ async  function hideAllBanners(){
           bannerType: locationData ? locationData.bannerType : undefined 
         };
         
-        setConsentState(preferences, cookieDays);
+        await setConsentState(preferences, cookieDays);
         updateGtagConsent(preferences);
         
         // STEP 5: Set consent as given and save to server
@@ -1391,10 +1456,10 @@ async  function hideAllBanners(){
       await hideAllBanners();
       
       // Unblock scripts based on saved consent preferences
-      const savedPreferences = getConsentPreferences();
+      const savedPreferences = await getConsentPreferences();
       if (savedPreferences.analytics || savedPreferences.marketing || savedPreferences.personalization) {
         // If any consent is given, unblock appropriate scripts
-        const selectedCategories = Object.keys(savedPreferences).filter(k => savedPreferences[k] && k !== 'donotshare');
+        const selectedCategories = Object.keys(savedPreferences).filter(k => savedPreferences[k] && k !== 'doNotShare');
         if (selectedCategories.length > 0) {
           enableScriptsByCategories(selectedCategories);
           
@@ -1664,4 +1729,18 @@ function blockAutomatedDecisionScripts() {
     }
   });
 }
-})(); 
+
+// Unblock any consent-related scripts that might have been blocked
+function unblockConsentScripts() {
+  // Unblock any consent-related scripts that might have been blocked
+  var scripts = document.head.querySelectorAll('script[type="text/plain"][src]');
+  scripts.forEach(function(script) {
+    if (script.src && (script.src.includes('consent.js') || script.src.includes('version.js') || script.src.includes('cmp_script'))) {
+      script.type = 'text/javascript';
+      script.removeAttribute('data-blocked-by-consent');
+      script.removeAttribute('data-blocked-by-ccpa');
+    }
+  });
+}
+
+})();
