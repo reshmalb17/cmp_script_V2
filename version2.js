@@ -866,7 +866,6 @@ async  function hideAllBanners(){
         hideBanner(document.getElementById("main-banner"));
         localStorage.setItem("consent-given", "true");
         await saveConsentStateToServer(preferences, cookieDays, true); // Pass true to include userAgent
-        updatePreferenceForm(preferences);
       };
     }
     
@@ -898,7 +897,6 @@ async  function hideAllBanners(){
         hideBanner(document.getElementById("main-banner"));
         localStorage.setItem("consent-given", "true");
         await saveConsentStateToServer(preferences, cookieDays, false);
-        updatePreferenceForm(preferences);
       };
     }
     
@@ -1008,7 +1006,6 @@ async  function hideAllBanners(){
         
         // Save to server
         await saveConsentStateToServer(preferences, cookieDays, true);
-        updatePreferenceForm(preferences);
       };
     }
     
@@ -1047,7 +1044,6 @@ async  function hideAllBanners(){
         
         // Save to server (original CCPA logic - always include userAgent)
         await saveConsentStateToServer(preferences, cookieDays, true);
-        updatePreferenceForm(preferences);
       };
     }
     
@@ -1116,7 +1112,6 @@ async  function hideAllBanners(){
         
         // Save to server with appropriate userAgent setting based on checkbox
         await saveConsentStateToServer(preferences, cookieDays, includeUserAgent);
-        updatePreferenceForm(preferences);
       };
     }
     
@@ -1190,7 +1185,6 @@ async  function hideAllBanners(){
         hideBanner(document.getElementById("initial-consent-banner"));
         localStorage.setItem("consent-given", "true");
         await saveConsentStateToServer(preferences, cookieDays, true); // Include userAgent for preferences
-        updatePreferenceForm(preferences);
       };
     }
 
@@ -1241,9 +1235,9 @@ async  function hideAllBanners(){
         
         // STEP 4: Save consent state with all preferences as false (like decline behavior)
         const preferences = { 
-          Analytics: false, 
-          Marketing: false, 
-          Personalization: false, 
+          analytics: false, 
+          marketing: false, 
+          personalization: false, 
           bannerType: locationData ? locationData.bannerType : undefined 
         };
         
@@ -1326,26 +1320,17 @@ async  function hideAllBanners(){
     // Universal "Do Not Share" link with consentbit-data-donotshare="consentbit-link-donotshare" attribute
     function setupDoNotShareLinks() {
       const doNotShareLinks = document.querySelectorAll('[consentbit-data-donotshare="consentbit-link-donotshare"]');
-      console.log('[CONSENT-DEBUG] Do not share links:', doNotShareLinks);
       doNotShareLinks.forEach(function(link) {
         link.onclick = function(e) {
           e.preventDefault();
-          console.log('[CONSENT-DEBUG] Do not share link clicked');
           
           // Hide all other banners first
           hideAllBanners();
           
           // Show the CCPA banner with ID "initial-consent-banner"
           const ccpaBanner = document.getElementById("initial-consent-banner");
-          console.log('[CONSENT-DEBUG] Looking for CCPA banner with ID "initial-consent-banner":', ccpaBanner);
           if (ccpaBanner) {
-            console.log('[CONSENT-DEBUG] Showing CCPA banner:', ccpaBanner);
             showBanner(ccpaBanner);
-          } else {
-            console.log('[CONSENT-DEBUG] CCPA banner not found. Available banners:');
-            console.log('[CONSENT-DEBUG] - initial-consent-banner:', document.getElementById("initial-consent-banner"));
-            console.log('[CONSENT-DEBUG] - consent-banner:', document.getElementById("consent-banner"));
-            console.log('[CONSENT-DEBUG] - main-banner:', document.getElementById("main-banner"));
           }
         };
       });
